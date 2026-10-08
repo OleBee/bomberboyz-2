@@ -1,4 +1,4 @@
-/* Bombekamp – original retro bombespill. All grafikk tegnes i kode. */
+/* BomberBoyz 2 – original retro bombespill. All grafikk tegnes i kode. */
 'use strict';
 (() => {
 // ---------- Konstanter ----------
@@ -10,7 +10,7 @@ const COLORS = [
   { c: '#e8483c', n: 'Rød' }, { c: '#3c7ae8', n: 'Blå' },
   { c: '#f0c020', n: 'Gul' }, { c: '#a050e0', n: 'Lilla' }];
 const STARTS = [[0, 0], [12, 10], [12, 0], [0, 10]];
-const PEER_PREFIX = 'bombekamp-v1-';
+const PEER_PREFIX = 'bomberboyz2-v1-';
 const SD_START = 90, SD_STEP = 0.4;   // «tiden renner ut»: brettet krymper fra 90 s
 const SPIRAL = (() => { const o = []; let x0 = 0, y0 = 0, x1 = COLS - 1, y1 = ROWS - 1;
   while (x0 <= x1 && y0 <= y1) {
@@ -857,7 +857,7 @@ $('btnCopy').onclick = async () => {
   try { await navigator.clipboard.writeText(v); } catch (e) { $('shareLink').select(); document.execCommand('copy'); }
   $('btnCopy').textContent = 'Kopiert!'; setTimeout(() => $('btnCopy').textContent = 'Kopier lenke', 1500);
 };
-$('btnShare').onclick = () => { navigator.share({ title: 'Bombekamp', text: 'Bli med på Bombekamp! Romkode: ' + room.code, url: shareUrl() }).catch(() => { }); };
+$('btnShare').onclick = () => { navigator.share({ title: 'BomberBoyz 2', text: 'Bli med på BomberBoyz 2! Romkode: ' + room.code, url: shareUrl() }).catch(() => { }); };
 
 // Navn og invitasjon fra lenke
 try { $('name').value = localStorage.getItem('bk-name') || ''; } catch (e) { }
@@ -885,5 +885,5 @@ function frame() {
 requestAnimationFrame(frame);
 
 // Lesetilgang for testing
-window.bombekamp = { get snap() { return lastSnap; }, get game() { return game; }, get role() { return net.role; }, get slot() { return mySlot; }, get members() { return room.members; } };
+window.bomberboyz = { get snap() { return lastSnap; }, get game() { return game; }, get role() { return net.role; }, get slot() { return mySlot; }, get members() { return room.members; } };
 })();
