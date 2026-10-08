@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Bombekamp – bombespill for opptil fire</title>
+<meta name="description" content="Bombekamp: retro bombespill i nettleseren for opptil fire spillere online. Ingen installasjon.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='7' cy='9' r='6' fill='%23141418'/><rect x='10' y='1' width='3' height='3' fill='%23ffb020'/></svg>">
+<style>
+  :root { --bg:#0e1016; --panel:#1b1f2a; --edge:#3a4152; --txt:#f1f1e8; --acc:#ffb020; --grn:#207a30; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--txt);
+    font-family: "Courier New", ui-monospace, Menlo, monospace; -webkit-user-select:none; user-select:none; }
+  body { display:flex; flex-direction:column; align-items:center; }
+  .screen { display:none; width:100%; max-width:760px; padding:16px; }
+  .screen.on { display:block; }
+  h1 { font-size: clamp(40px, 10vw, 72px); margin: 18px 0 4px; text-align:center; letter-spacing:4px;
+       color:#ffd23a; text-shadow: 4px 4px 0 #c0391b, 8px 8px 0 #000; }
+  .sub { text-align:center; opacity:.8; margin-bottom: 20px; }
+  .panel { background:var(--panel); border:4px solid var(--edge); padding:16px; margin:12px 0;
+           box-shadow: 6px 6px 0 #000; }
+  .panel h2 { margin:0 0 10px; font-size:20px; color:var(--acc); }
+  label { display:block; font-size:14px; opacity:.85; margin-bottom:6px; }
+  input[type=text] { width:100%; font: inherit; font-size:20px; padding:10px; background:#0b0d12; color:var(--txt);
+    border:3px solid var(--edge); outline:none; -webkit-user-select:text; user-select:text; }
+  input[type=text]:focus { border-color: var(--acc); }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .row > * { flex: 1 1 auto; }
+  button { font: inherit; font-size:18px; font-weight:bold; padding:12px 16px; cursor:pointer; color:#111;
+    background:var(--acc); border:none; box-shadow: inset -4px -4px 0 rgba(0,0,0,.35), inset 4px 4px 0 rgba(255,255,255,.35), 4px 4px 0 #000; }
+  button:active { transform: translate(2px,2px); box-shadow: inset -4px -4px 0 rgba(0,0,0,.35), 2px 2px 0 #000; }
+  button.alt { background:#7ec8ff; } button.grey { background:#b8bec8; } button.red { background:#ff6b5a; }
+  button:disabled { opacity:.45; cursor:default; }
+  .big { font-size:24px; padding:16px 20px; width:100%; }
+  .invite { border-color: var(--acc); }
+  .err { color:#ff8a7a; min-height:1.2em; margin-top:8px; }
+  .hint { font-size:13px; opacity:.7; margin-top:10px; line-height:1.5; }
+  .code { font-size:44px; letter-spacing:8px; color:#ffd23a; text-align:center; margin:4px 0 8px; }
+  .slots { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin:12px 0; }
+  .slot { border:3px solid var(--edge); padding:10px; display:flex; align-items:center; gap:10px; min-height:62px; background:#12151d; }
+  .slot canvas { width:40px; height:40px; image-rendering: pixelated; }
+  .slot.empty { opacity:.45; }
+  .slot .nm { font-weight:bold; } .slot .tag { font-size:12px; opacity:.7; }
+  #game { max-width: 900px; padding:6px; }
+  #hud { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-bottom:6px; font-size:14px; }
+  .hp { display:flex; align-items:center; gap:6px; padding:4px 8px; background:#12151d; border:2px solid var(--edge); }
+  .hp.dead { opacity:.35; text-decoration: line-through; }
+  .hp i { display:inline-block; width:12px; height:12px; }
+  #wrap { position:relative; width:100%; display:flex; justify-content:center; }
+  #cv { image-rendering: pixelated; image-rendering: crisp-edges; display:block; background:#000;
+        width: min(100%, calc((100vh - 120px) * 240 / 208)); height:auto; box-shadow: 6px 6px 0 #000; }
+  body.touch #cv { width: min(100%, calc((100vh - 260px) * 240 / 208)); }
+  #over { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background: rgba(0,0,0,.55); }
+  #over.on { display:flex; }
+  #over .panel { min-width: min(92%, 380px); text-align:center; }
+  #over table { width:100%; border-collapse: collapse; margin:10px 0 14px; font-size:18px; }
+  #over td { padding:6px; border-bottom: 2px solid var(--edge); text-align:left; }
+  #over td.s { text-align:right; font-weight:bold; color:#ffd23a; }
+  #wintxt { font-size:26px; color:#ffd23a; margin-bottom:6px; }
+  #touch { display:none; justify-content:space-between; align-items:center; margin-top:10px; padding: 0 6px; }
+  body.touch #touch { display:flex; }
+  .dpad { display:grid; grid-template-columns: 62px 62px 62px; grid-template-rows: 62px 62px 62px; gap:4px; }
+  .dpad button, #tbomb { padding:0; font-size:26px; touch-action:none; }
+  .dpad .u { grid-column:2; grid-row:1; } .dpad .l { grid-column:1; grid-row:2; }
+  .dpad .r { grid-column:3; grid-row:2; } .dpad .d { grid-column:2; grid-row:3; }
+  #tbomb { width:104px; height:104px; border-radius:50%; background:#ff6b5a; font-size:22px; }
+  #gamebar { display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:13px; opacity:.85; gap:8px; }
+  #gamebar button { font-size:13px; padding:6px 10px; }
+  .keys { opacity:.75; }
+  body.touch .keys { display:none; }
+  footer { font-size:12px; opacity:.5; text-align:center; padding:10px; }
+</style>
+</head>
+<body>
+
+<!-- MENY -->
+<section id="menu" class="screen on">
+  <h1>BOMBEKAMP</h1>
+  <div class="sub">Retro bombespill for 1–4 spillere – rett i nettleseren</div>
+
+  <div class="panel">
+    <label for="name">Ditt navn</label>
+    <input id="name" type="text" maxlength="12" placeholder="Skriv navnet ditt" autocomplete="off">
+  </div>
+
+  <div class="panel invite" id="invitePanel" style="display:none">
+    <h2>Du er invitert!</h2>
+    <div>Rom <b id="inviteCode"></b> venter på deg.</div>
+    <div style="margin-top:12px"><button class="big" id="btnJoinInvite">Bli med</button></div>
+  </div>
+
+  <div class="panel">
+    <h2>Spill med venner</h2>
+    <button class="big" id="btnCreate">Lag rom</button>
+    <div class="hint">Du får en romkode og en lenke du kan dele. Opptil tre venner kan bli med.</div>
+    <div style="height:14px"></div>
+    <label for="joinCode">Har du en kode eller lenke?</label>
+    <div class="row">
+      <input id="joinCode" type="text" placeholder="F.eks. K7QXM" autocomplete="off" style="flex: 3 1 160px; text-transform: uppercase">
+      <button class="alt" id="btnJoin" style="flex: 1 1 100px">Bli med</button>
+    </div>
+    <div class="err" id="menuErr"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Spill alene</h2>
+    <button class="big grey" id="btnSolo">Spill mot boter</button>
+  </div>
+  <footer>Styring: piltaster eller WASD, mellomrom = bombe. På mobil brukes knappene under brettet.</footer>
+</section>
+
+<!-- LOBBY -->
+<section id="lobby" class="screen">
+  <h1 style="font-size:40px">BOMBEKAMP</h1>
+  <div class="panel">
+    <h2 id="lobbyTitle">Rom</h2>
+    <div class="code" id="lobbyCode">-----</div>
+    <div class="row" id="shareRow">
+      <input id="shareLink" type="text" readonly>
+      <button class="alt" id="btnCopy" style="flex:0 0 auto">Kopier lenke</button>
+      <button class="alt" id="btnShare" style="flex:0 0 auto; display:none">Del</button>
+    </div>
+    <div class="slots" id="slots"></div>
+    <div id="hostCtl" class="row">
+      <button class="grey" id="btnAddBot">+ Legg til bot</button>
+      <button class="grey" id="btnDelBot">– Fjern bot</button>
+    </div>
+    <div style="height:12px"></div>
+    <button class="big" id="btnStart">Start</button>
+    <div id="waitTxt" class="hint" style="font-size:16px; text-align:center; display:none">Venter på at verten trykker Start …</div>
+    <div class="err" id="lobbyErr"></div>
+    <div style="height:8px"></div>
+    <button class="red" id="btnLeaveLobby">Forlat rommet</button>
+  </div>
+</section>
+
+<!-- SPILL -->
+<section id="game" class="screen">
+  <div id="hud"></div>
+  <div id="wrap">
+    <canvas id="cv" width="240" height="208"></canvas>
+    <div id="over">
+      <div class="panel">
+        <div id="wintxt"></div>
+        <table id="score"></table>
+        <div id="overHost">
+          <button class="big" id="btnAgain">Ny runde</button>
+          <div style="height:10px"></div>
+          <button class="grey" id="btnToLobby">Til lobbyen</button>
+        </div>
+        <div id="overWait" class="hint" style="font-size:16px">Venter på at verten starter ny runde …</div>
+      </div>
+    </div>
+  </div>
+  <div id="touch">
+    <div class="dpad">
+      <button class="u" data-dir="up">▲</button>
+      <button class="l" data-dir="left">◀</button>
+      <button class="r" data-dir="right">▶</button>
+      <button class="d" data-dir="down">▼</button>
+    </div>
+    <button id="tbomb">BOMBE</button>
+  </div>
+  <div id="gamebar">
+    <span class="keys">Piltaster/WASD flytter · Mellomrom legger bombe</span>
+    <span id="netInfo"></span>
+    <button class="red" id="btnQuit">Avslutt</button>
+  </div>
+</section>
+
+<script src="peerjs.min.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
