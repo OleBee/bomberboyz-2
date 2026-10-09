@@ -22,9 +22,8 @@ function spiralOrder(cols, rows, rings) {
 // Testflagg: med bk-test=1 og bk-timescale=N går vertens klokke N ganger fortere (bare for automatiske tester)
 const TIME_SCALE = (() => { try { return localStorage.getItem('bk-test') === '1' ? Math.max(1, Math.min(60, +localStorage.getItem('bk-timescale') || 1)) : 1; } catch (e) { return 1; } })();
 const MAP_NAME = { big: 'Stort (27×23)', small: 'Vanlig (13×11)' };
-let prefMap = 'big';   // valgt på startskjermen eller i lobbyen; huskes på enheten
-try { const v = localStorage.getItem('bk-map'); if (v === 'big' || v === 'small') prefMap = v; } catch (e) { }
-function setPrefMap(id) { prefMap = id; try { localStorage.setItem('bk-map', id); } catch (e) { } const t = document.querySelectorAll('#mapPick button'); t.forEach(b => b.classList.toggle('on', b.dataset.m === id)); }
+let prefMap = 'big';   // alltid stort brett (brettvalget er fjernet); bare automatiske tester (bk-test=1) kan be om vanlig brett med bk-map=small
+try { if (localStorage.getItem('bk-test') === '1' && localStorage.getItem('bk-map') === 'small') prefMap = 'small'; } catch (e) { }
 const MAPS = {
   small: { c: 13, r: 11, rings: 2, starts: [[0, 0], [12, 10], [12, 0], [0, 10], [6, 0], [6, 10], [0, 6], [12, 4]] },
   big:   { c: 27, r: 23, rings: 3, starts: [[0, 0], [26, 22], [26, 0], [0, 22], [14, 0], [12, 22], [0, 12], [26, 10]] },
@@ -1219,7 +1218,6 @@ function renderLobby() {
   $('btnStart').style.display = host ? '' : 'none';
   $('waitTxt').style.display = host ? 'none' : '';
   $('btnAddBot').disabled = room.members.length >= MAXP;
-  $('btnMap').textContent = 'Brett: ' + (room.map === 'big' ? 'Stort' : 'Vanlig');
   $('mapInfo').textContent = 'Brett: ' + MAP_NAME[room.map === 'big' ? 'big' : 'small'] + '' + ' · opptil 8 spillere';
   $('btnDelBot').disabled = !room.members.some(m => m.bot);
   $('btnStart').disabled = room.members.length < 2;
@@ -1270,9 +1268,6 @@ $('btnDelBot').onclick = () => {
   if (b) { room.members = room.members.filter(m => m !== b); room.scores[b.slot] = 0; hostLobbyUpdate(); }
 };
 $('btnStart').onclick = () => { autoFull(); startRound(); };
-$('btnMap').onclick = () => { room.map = room.map === 'big' ? 'small' : 'big'; setPrefMap(room.map); hostLobbyUpdate(); };
-document.querySelectorAll('#mapPick button').forEach(b => b.addEventListener('click', () => setPrefMap(b.dataset.m)));
-setPrefMap(prefMap);
 $('btnAgain').onclick = () => startRound();
 $('btnToLobby').onclick = () => { game = null; room.phase = 'lobby'; show('lobby'); hostLobbyUpdate(); };
 $('btnLeaveLobby').onclick = () => leave('');

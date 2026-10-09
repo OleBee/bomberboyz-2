@@ -312,7 +312,6 @@ window.BBX = (() => {
     const keys = Object.keys(db);
     if (keys.length > 300) keys.sort((a, b) => (db[a].t || 0) - (db[b].t || 0)).slice(0, keys.length - 300).forEach(k => delete db[k]);
     store.set(LB_KEY, db);
-    if (tab === 'local') renderMenu();
   }
   const sortRows = rows => rows.slice().sort((a, b) => b.w - a.w || (b.w / Math.max(1, b.g)) - (a.w / Math.max(1, a.g)) || b.k - a.k || a.g - b.g);
   function localTop(n = 10) { return sortRows(Object.values(store.get(LB_KEY, {}))).slice(0, n); }
@@ -363,27 +362,21 @@ window.BBX = (() => {
     });
     return t;
   }
-  let tab = 'local';
+  // «Beste spillere» viser bare den felles listen (alle spillere). Egen statistikk lagres fortsatt lokalt, men vises ikke.
   async function renderMenu() {
     const box = $('lbList'); if (!box) return;
-    const tabs = $('lbTabs'); if (tabs) tabs.style.display = globalOn ? '' : 'none';
-    document.querySelectorAll('#lbTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
     const me = cleanName(($('name') && $('name').value) || '').toLowerCase();
-    const put = (rows, empty) => {
-      box.innerHTML = '';
-      if (!rows || !rows.length) { const d = document.createElement('div'); d.className = 'bbx-empty'; d.textContent = empty; box.appendChild(d); return; }
-      box.appendChild(table(rows.map(r => Object.assign({ me: me && r.n.toLowerCase() === me }, r))));
-    };
-    if (tab === 'global' && globalOn) {
-      box.innerHTML = '<div class="bbx-empty">Henter …</div>';
-      try { put(await globalTop(10), 'Ingen resultater ennå.'); }
-      catch (e) { box.innerHTML = '<div class="bbx-empty">Fikk ikke hentet den felles listen akkurat nå.</div>'; }
-    } else put(localTop(10), 'Ingen kamper på denne enheten ennå. Spill en runde, så dukker du opp her!');
+    const msg = t => { box.innerHTML = ''; const d = document.createElement('div'); d.className = 'bbx-empty'; d.textContent = t; box.appendChild(d); };
+    const EMPTY = 'Ingen spillere ennå – spill tre runder for å komme på lista';
+    if (!globalOn) { msg(EMPTY); return; }
+    if (!box.querySelector('table')) msg('Henter …');
+    try {
+      const rows = await globalTop(10);
+      if (!rows || !rows.length) { msg(EMPTY); return; }
+      box.innerHTML = ''; box.appendChild(table(rows.map(r => Object.assign({ me: me && r.n.toLowerCase() === me }, r))));
+    } catch (e) { msg('Kunne ikke hente lista'); }
   }
-  function setupMenu() {
-    document.querySelectorAll('#lbTabs button').forEach(b => b.addEventListener('click', () => { tab = b.dataset.t; renderMenu(); }));
-    renderMenu();
-  }
+  function setupMenu() { renderMenu(); }
 
   // =====================================================================
   // Stil (SNES-aktige menypaneler) + lydknapp
@@ -395,9 +388,6 @@ window.BBX = (() => {
     outline:4px solid #000; box-shadow: 8px 8px 0 #000; padding:14px 14px 10px; margin:18px 4px 12px; }
   .bbx-board h2 { margin:0 0 10px; font-size:22px; letter-spacing:2px; color:#ffd23a; text-shadow: 3px 3px 0 #c0391b, 5px 5px 0 #000; text-align:center; }
   .bbx-board .hint { color:#dfe6ff; }
-  #lbTabs { display:flex; gap:8px; margin-bottom:10px; }
-  #lbTabs button { flex:1; font-size:14px; padding:7px 8px; background:#b8bec8; }
-  #lbTabs button.on { background:#ffd23a; }
   .bbx-tab { width:100%; border-collapse:collapse; font-size:16px; text-shadow: 2px 2px 0 #000; }
   .bbx-tab th { font-size:12px; letter-spacing:1px; color:#9fd0ff; text-align:right; padding:2px 6px 6px; }
   .bbx-tab th:nth-child(2), .bbx-tab td.nm { text-align:left; }
@@ -416,13 +406,11 @@ window.BBX = (() => {
   /* Beste spillere: på startskjermen ligger listen i menyrammen (#lbSlot). I lobbyen flyttes den ut
      som fast kolonne til venstre på brede skjermer; skjult mens det spilles og i lobbyen på smale skjermer. */
   #lbSlot #lbPanel h2 { font-size:19px; }
-  #lbSlot #lbPanel #lbTabs button { font-size:12px; padding:6px 4px; }
   #lbSlot #lbPanel .bbx-tab { font-size:14px; }
   #lbSlot #lbPanel .bbx-tab td { padding:5px 4px; }
   #lbSlot #lbPanel .bbx-tab th { padding:2px 4px 6px; font-size:10px; }
   #lbSlot #lbPanel .bbx-tab td.nm { max-width:9em; }
   #lbSlotLobby #lbPanel h2 { font-size:19px; }
-  #lbSlotLobby #lbPanel #lbTabs button { font-size:12px; padding:6px 4px; }
   #lbSlotLobby #lbPanel .bbx-tab { font-size:14px; }
   #lbSlotLobby #lbPanel .bbx-tab td { padding:5px 4px; }
   #lbSlotLobby #lbPanel .bbx-tab th { padding:2px 4px 6px; font-size:10px; }

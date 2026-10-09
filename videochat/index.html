@@ -127,7 +127,7 @@
   body[data-screen=game] #topright { display:grid; grid-template-columns:auto; gap:5px 6px; align-items:center; justify-items:end; position:fixed; z-index:6;
     top:calc(8px + env(safe-area-inset-top)); right:calc(8px + env(safe-area-inset-right)); }
   #topright #netInfo { grid-column:1 / -1; font-size:11px; opacity:.75; white-space:nowrap; }
-  #topright #netInfo:empty { display:none; }
+  #topright #netInfo { display:none !important; }   /* ingen romtekst i spillet (romkoden står i lobbyen) */
   #topright #btnQuit { font-size:12px; padding:5px 8px; }
   #topright #sndSlot { display:flex; }
   body[data-screen=game] #avGame #topright { position:static; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:5px 6px; margin-bottom:8px; }
@@ -312,7 +312,6 @@
    <div id="lbSlot">
       <div class="bbx-board" id="lbPanel">
         <h2>🏆 BESTE SPILLERE</h2>
-        <div id="lbTabs" style="display:none"><button type="button" data-t="local" class="on">Denne enheten</button><button type="button" data-t="global">Alle spillere</button></div>
         <div id="lbList"></div>
         <div class="hint">Seire, runder og drap per navn. Boter telles ikke.</div>
       </div>

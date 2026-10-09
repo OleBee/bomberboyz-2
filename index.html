@@ -127,7 +127,7 @@
     top:calc(8px + env(safe-area-inset-top)); right:calc(8px + env(safe-area-inset-right)); }
   #game > #topright { justify-items:start; }
   #topright #netInfo { grid-column:1 / -1; font-size:11px; opacity:.75; white-space:nowrap; }
-  #topright #netInfo:empty { display:none; }
+  #topright #netInfo { display:none !important; }   /* ingen romtekst i spillet (romkoden står i lobbyen) */
   #topright #btnQuit { font-size:12px; padding:5px 8px; }
   #topright #sndSlot { display:flex; }
   body[data-screen=game] #avGame #topright { position:static; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:5px 6px; margin-bottom:8px; }
@@ -219,10 +219,6 @@
   #lbSlotLobby #lbPanel { flex:1; margin:0; }
   @media (max-width: 1099px) { .lcols { grid-template-columns: 1fr; } #lbSlotLobby { display:none; } #lobby.screen { max-width:760px; } }
   /* Brettvalg på startskjermen (gjelder både rom du lager og spill mot boter) */
-  #mapPick { display:flex; align-items:center; gap:8px; margin:0 0 12px; }
-  #mapPick .lbl { font-weight:bold; color:var(--acc); font-size:15px; margin-right:2px; }
-  #mapPick button { flex:1; font-size:15px; padding:8px 8px; background:#b8bec8; }
-  #mapPick button.on { background:#7ec8ff; outline:3px solid #ffd23a; outline-offset:-3px; }
   /* HUD-rad: spillerne i midten, lydknappen liten oppe til høyre (over brettet og videorutene) */
   #hudrow { display:grid; grid-template-columns: 34px 1fr 34px; align-items:start; gap:6px; margin-bottom:6px; }
   #hudrow #hud { margin-bottom:0; padding:0; }
@@ -260,7 +256,6 @@
    <div id="lbSlot">
       <div class="bbx-board" id="lbPanel">
         <h2>🏆 BESTE SPILLERE</h2>
-        <div id="lbTabs" style="display:none"><button type="button" data-t="local" class="on">Denne enheten</button><button type="button" data-t="global">Alle spillere</button></div>
         <div id="lbList"></div>
         <div class="hint">Seire, runder og drap per navn. Boter telles ikke.</div>
       </div>
@@ -290,11 +285,6 @@
      <div class="err" id="menuErr"></div>
 
      <div class="msep"></div>
-     <div id="mapPick" role="group" aria-label="Brett">
-      <span class="lbl">Brett:</span>
-      <button type="button" data-m="big" class="on">Stort 27×23</button>
-      <button type="button" data-m="small">Vanlig 13×11</button>
-     </div>
      <h2>Spill alene</h2>
      <button class="big grey" id="btnSolo">Spill mot boter</button>
     </div>
@@ -325,7 +315,6 @@
      <div id="hostCtl" class="row">
        <button class="grey" id="btnAddBot">+ Legg til bot</button>
        <button class="grey" id="btnDelBot">– Fjern bot</button>
-       <button class="alt" id="btnMap">Brett: Vanlig</button>
      </div>
      <div style="height:12px"></div>
      <button class="big" id="btnStart">Start</button>
