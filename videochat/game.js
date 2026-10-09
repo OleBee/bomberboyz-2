@@ -529,6 +529,10 @@ function fitView() {
   FIT.tile = tt;
   const cssW = FWc * tt, cssH = FHc * tt, key = cssW + 'x' + cssH + ':' + avW;
   if (key !== FIT.key) { FIT.key = key; cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px'; $('wrap').style.width = (cssW + 8) + 'px'; $('stage').style.width = stacked ? '' : (cssW + 8 + avW) + 'px'; g.style.setProperty('--bw', (cssW + avW) + 'px'); }
+  // spillerlista starter på linje med brettets overkant
+  const hr = $('hudrow'), cr = cv.getBoundingClientRect(), hrr = hr.getBoundingClientRect();
+  const first = [...hr.children].find(e => e.getClientRects().length);
+  if (cr.height && hrr.height && first) { const pt = Math.max(0, Math.round((parseFloat(hr.style.paddingTop) || 0) + cr.top - first.getBoundingClientRect().top)); if (hr.style.paddingTop !== pt + 'px') hr.style.paddingTop = pt + 'px'; }
 }
 window.addEventListener('resize', fitView);
 if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if ($('game').classList.contains('on')) fitView(); }); ro.observe($('hudrow')); ro.observe($('avGame')); }
@@ -1309,7 +1313,7 @@ function updateTimer() {   // nedtelling i HUD-raden: skjult til 0:30 gjenstår,
     txt = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
     el.classList.toggle('hurry', s.ph === 'play');
   }
-  if (txt !== timerTxt) { timerTxt = txt; el.textContent = txt; el.style.display = txt ? 'block' : 'none'; $('hudrow').classList.toggle('tmr', !!txt); }
+  if (txt !== timerTxt) { timerTxt = txt; el.textContent = txt; el.style.display = txt ? 'block' : 'none'; el.parentNode.style.display = txt ? '' : 'none'; $('hudrow').classList.toggle('tmr', !!txt); }
 }
 function audioEvents(a, s) {
   if (!s || !s.p) return;

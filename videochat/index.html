@@ -97,9 +97,12 @@
   body.touch #game.screen { padding: 6px calc(var(--bomb) + 26px) 6px 8px; }
   body.touch.lcol #hudrow { flex:0 0 calc(var(--dp) * 3 + 8px); width:calc(var(--dp) * 3 + 8px); gap:6px; }
   body.touch.lcol #timer { font-size:20px; }
-  body.touch.lcol #hud, body.touch.lcol #hud.many { display:grid; grid-template-columns:1fr 1fr; gap:4px; font-size:12px; }
-  body.touch.lcol #hud .hp, body.touch.lcol #hud.many .hp { display:flex; gap:4px; padding:2px 4px; justify-content:space-between; align-items:center; }
-  body.touch.lcol #hud .hp b, body.touch.lcol #hud .hp span { display:none; }
+  /* spillerlista: én spiller per rad, øverst på linje med brettet (padding-top settes i fitView), like høye rader ned mot styrekorset */
+  body.lcol #hud, body.lcol #hud.many { flex:1 1 auto; min-height:0; }
+  body.lcol #hud .hp, body.lcol #hud.many .hp { flex:1 1 0; min-height:0; max-height:72px; align-content:center; overflow:hidden; }
+  body.touch.lcol #hud, body.touch.lcol #hud.many { gap:4px; font-size:12px; }
+  body.touch.lcol #hud .hp, body.touch.lcol #hud.many .hp { grid-template-columns:12px 1fr auto; grid-template-areas:"i b e"; gap:0 6px; padding:2px 6px; max-height:72px; align-items:center; font-size:clamp(11px, 1.3vw, 15px); }
+  body.touch.lcol #hud .hp span { display:none; }
   body.touch.lcol #hud .hp i { width:12px; height:12px; }
   body.touch.lcol #hud .hp.me { border-color:#ffd23a; }
   body.touch.lcol #gamebar { font-size:11px; gap:4px; }
@@ -127,6 +130,7 @@
   #topright #btnQuit { font-size:12px; padding:5px 8px; }
   #topright #sndSlot { display:flex; }
   body[data-screen=game] #avGame #topright { position:static; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:5px 6px; margin-bottom:8px; }
+  #avGame #topright #netInfo { flex-basis:100%; text-align:right; }
   #rotate { display:none; }
   @media (orientation: portrait) {
     body.touch #rotate { display:flex; position:fixed; inset:0; z-index:9999; background:var(--bg); color:#ffd23a; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; font-size:26px; font-weight:bold; padding:20px; }
@@ -383,7 +387,7 @@
 <!-- SPILL -->
 <section id="game" class="screen">
   <div id="playarea">
-  <div id="hudrow"><div><div id="timer" title="Tid igjen av runden"></div></div><div id="hud"></div></div>
+  <div id="hudrow"><div style="display:none"><div id="timer" title="Tid igjen av runden"></div></div><div id="hud"></div></div>
   <div id="stage">
   <div id="wrap">
     <canvas id="cv" width="240" height="208"></canvas>
