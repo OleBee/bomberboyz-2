@@ -14,6 +14,8 @@ window.BBX = (() => {
   // =====================================================================
   const LEVELS = [0.25, 0.5, 0.85];
   const snd = Object.assign({ vol: 0.5, muted: false }, store.get('bk-sound', {}));
+  // lydknappen er fjernet: lyd er på som standard. Touch-enheter har ingen M-tast, så en gammel «av»-innstilling gjelder ikke der.
+  try { if (snd.muted && window.matchMedia && matchMedia('(pointer: coarse)').matches) snd.muted = false; } catch (e) { }
   let ctx = null, master = null, musicBus = null, sfxBus = null, pulse = null, noiseBuf = null;
   let want = null, cur = null, seqTimer = null, ana = null;
   const dbg = { started: false, music: null, sfx: {}, jingles: [] };
@@ -436,9 +438,7 @@ window.BBX = (() => {
   `;
   function mountUi() {
     const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
-    const b = document.createElement('button'); b.id = 'bbxSnd'; b.type = 'button';
-    b.addEventListener('click', e => { init(); cycleVol(); e.currentTarget.blur(); });
-    document.body.appendChild(b); saveSnd();
+    applyVol();   // ingen lydknapp (M = av/på på PC)
     setupMenu();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountUi); else mountUi();
@@ -446,8 +446,7 @@ window.BBX = (() => {
   return {
     init, music, jingle, sfx, toggleMute, cycleVol, get sound() { return Object.assign({}, snd); },
     micState, get ctxState() { return ctx ? ctx.state : 'none'; },
-    dock(id) { const el = $('lbPanel'), slot = $('lbSlot'); if (!el) return; const lob = $('lbSlotLobby'); const to = id === 'menu' && slot ? slot : id === 'lobby' && lob ? lob : document.body; if (el.parentNode !== to) to.appendChild(el);
-      const sb = $('bbxSnd'), ss = $('sndSlot'); if (sb) { const inGame = id === 'game' && ss; sb.classList.toggle('inhud', !!inGame); const t2 = inGame ? ss : document.body; if (sb.parentNode !== t2) t2.appendChild(sb); } },
+    dock(id) { const el = $('lbPanel'), slot = $('lbSlot'); if (!el) return; const lob = $('lbSlotLobby'); const to = id === 'menu' && slot ? slot : id === 'lobby' && lob ? lob : document.body; if (el.parentNode !== to) to.appendChild(el); },
     recordLocal, localTop, submitGlobal, globalTop, get globalOn() { return globalOn; }, table, renderMenu,
     get level() { if (!ana) return 0; const d = new Float32Array(ana.fftSize); ana.getFloatTimeDomainData(d); let m = 0; for (const v of d) m = Math.max(m, Math.abs(v)); return +m.toFixed(4); },
     get debug() { return Object.assign({ ctx: ctx ? ctx.state : 'none', gain: master ? +master.gain.value.toFixed(3) : null }, dbg); },

@@ -117,6 +117,16 @@
   body.touch #avGame { flex:0 0 clamp(110px, 16vw, 196px); max-height:calc(100vh - 12px); overflow:auto; }
   body.touch.lcol #playarea { justify-content:flex-start; }   /* kolonnen helt til venstre (samme marg som bombeknappen til høyre) */
   body.touch.lcol #playarea > #wrap, body.touch.lcol #stage { align-self:center; margin-left:auto; margin-right:auto; }
+  /* lyd, Avslutt og rominfo øverst i høyre hjørne (videochat: øverst i videokolonnen) */
+  #topright { display:none; }
+  body[data-screen=game] #topright { display:grid; grid-template-columns:auto; gap:5px 6px; align-items:center; justify-items:end; position:fixed; z-index:6;
+    top:calc(8px + env(safe-area-inset-top)); right:calc(8px + env(safe-area-inset-right)); }
+  #topright #netInfo { grid-column:1 / -1; font-size:11px; opacity:.75; white-space:nowrap; }
+  #topright #netInfo:empty { display:none; }
+  #topright #btnQuit { font-size:12px; padding:5px 8px; }
+  #topright #sndSlot { display:flex; }
+  body[data-screen=game] #avGame #topright { position:static; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:5px 6px; margin-bottom:8px; }
+  body.lcol:not(.touch) #game.screen { padding-right:96px; }   /* plass til hjørneknappene */
   #rotate { display:none; }
   @media (orientation: portrait) {
     body.touch #rotate { display:flex; position:fixed; inset:0; z-index:9999; background:var(--bg); color:#ffd23a; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; font-size:26px; font-weight:bold; padding:20px; }
@@ -285,7 +295,7 @@
     </div>
    </div>
   </div>
-  <footer>Styring: piltaster eller WASD, mellomrom = bombe, M = lyd av/på. På mobil brukes knappene under brettet.<br>Power-ups: 💣 flere bomber · 🔥 lengre flamme · ⚡ fart · 🥊 Boksehanske: dytt bomber</footer>
+  <footer>Styring: piltaster eller WASD, mellomrom = bombe, M = lyd av/på. På nettbrett og mobil (liggende): styrekors til venstre, bombe til høyre.<br>Power-ups: 💣 flere bomber · 🔥 lengre flamme · ⚡ fart · 🥊 Boksehanske: dytt bomber</footer>
  </div>
 </section>
 
@@ -327,7 +337,7 @@
 <!-- SPILL -->
 <section id="game" class="screen">
   <div id="playarea">
-  <div id="hudrow"><div><div id="timer" title="Tid igjen av runden"></div></div><div id="hud"></div><span id="sndSlot"></span></div>
+  <div id="hudrow"><div><div id="timer" title="Tid igjen av runden"></div></div><div id="hud"></div></div>
   <div id="wrap">
     <canvas id="cv" width="240" height="208"></canvas>
     <div id="over">
@@ -344,6 +354,7 @@
     </div>
   </div>
   </div><!-- /playarea -->
+  <div id="topright"></div>
   <div id="touch">
     <div class="dpad">
       <button class="u" data-dir="up">▲</button>

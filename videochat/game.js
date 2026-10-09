@@ -538,10 +538,11 @@ if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if ($('game')
 function colWidth() { const w = $('hudrow').offsetWidth; return w || (document.body.classList.contains('touch') ? 158 : 200); }
 function placeLayout() {
   const touch = document.body.classList.contains('touch');
+  if (!placeLayout.tr) { placeLayout.tr = 1; const tr = $('topright'); tr.append($('btnQuit'), $('netInfo')); $('avGame').prepend(tr); }   // hjørneknappene
   if (placeLayout.mode === touch) return; placeLayout.mode = touch;
   document.body.classList.add('lcol');
   const hr = $('hudrow'), gb = $('gamebar'), ss = $('sndSlot'), gbt = gb.querySelector('.gbtns'), dp = document.querySelector('.dpad');
-  if (gb.parentNode !== hr) { hr.appendChild(gb); gbt.insertBefore(ss, gbt.firstChild); }
+  if (gb.parentNode !== hr) hr.appendChild(gb);
   if (touch) hr.appendChild(dp); else $('touch').insertBefore(dp, $('touch').firstChild);
 }
 // Fullskjerm som standard (PC, nettbrett, Android): bes om inne i klikket/tastetrykket som starter et spill (nettlesere krever en brukerhandling).
@@ -1243,7 +1244,7 @@ $('btnStart').onclick = () => { autoFull(); startRound(); };
 $('btnAgain').onclick = () => startRound();
 $('btnToLobby').onclick = () => { game = null; room.phase = 'lobby'; show('lobby'); hostLobbyUpdate(); };
 $('btnLeaveLobby').onclick = () => leave('');
-$('btnQuit').onclick = () => { if (confirm('Vil du avslutte spillet?')) leave(''); };
+$('btnQuit').onclick = () => { if (confirm('Avslutte spillet?')) leave(''); };
 $('btnCopy').onclick = async () => {
   const v = $('shareLink').value;
   try { await navigator.clipboard.writeText(v); } catch (e) { $('shareLink').select(); document.execCommand('copy'); }
