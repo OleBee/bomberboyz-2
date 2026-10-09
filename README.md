@@ -30,6 +30,7 @@ Retro bombespill i nettleseren for 1–4 spillere, med video- og lydchat mellom 
 ## Struktur
 - `/` – videoversjonen (PeerJS-prefiks `bomberboyz2-video-v1-`).
 - `/legacy/` – originalversjonen uten video (PeerJS-prefiks `bomberboyz2-v1-`). Egne rom, kolliderer ikke.
+  Legacy har i tillegg opptil 8 spillere og valget «Brett: Vanlig (13×11) / Stort (25×21)». På stort brett vises hele brettet på store skjermer, ellers følger kameraet deg.
 - `bbx.js` – musikk, lyd og toppliste (felles for begge versjoner), `bbx-config.js` – innstillinger for felles toppliste.
 - `/video/` – videresender til `/` med romkode (`?rom=`) og hash bevart.
 

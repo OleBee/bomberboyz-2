@@ -44,7 +44,7 @@
   .err { color:#ff8a7a; min-height:1.2em; margin-top:8px; }
   .hint { font-size:13px; opacity:.7; margin-top:10px; line-height:1.5; }
   .code { font-size:44px; letter-spacing:8px; color:#ffd23a; text-align:center; margin:4px 0 8px; }
-  .slots { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin:12px 0; }
+  .slots { display:grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap:10px; margin:12px 0; }
   .slot { border:3px solid var(--edge); padding:10px; display:flex; align-items:center; gap:10px; min-height:62px; background:#12151d; }
   .slot canvas { width:40px; height:40px; image-rendering: pixelated; }
   .slot.empty { opacity:.45; }
@@ -52,6 +52,8 @@
   #game { max-width: 900px; padding:6px; }
   #hud { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-bottom:6px; font-size:14px; }
   .hp { display:flex; align-items:center; gap:6px; padding:4px 8px; background:#12151d; border:2px solid var(--edge); }
+  #hud { padding: 0 54px; }
+  #hud.many { font-size:12px; gap:4px; } #hud.many .hp { padding:2px 6px; }
   .hp.dead { opacity:.35; text-decoration: line-through; }
   .hp i { display:inline-block; width:12px; height:12px; }
   #wrap { position:relative; width:100%; display:flex; justify-content:center; }
@@ -100,7 +102,7 @@
   <div class="panel">
     <h2>Spill med venner</h2>
     <button class="big" id="btnCreate">Lag rom</button>
-    <div class="hint">Du får en romkode og en lenke du kan dele. Opptil tre venner kan bli med.</div>
+    <div class="hint">Du får en romkode og en lenke du kan dele. Opptil sju venner kan bli med.</div>
     <div style="height:14px"></div>
     <label for="joinCode">Har du en kode eller lenke?</label>
     <div class="row">
@@ -134,11 +136,13 @@
       <button class="alt" id="btnCopy" style="flex:0 0 auto">Kopier lenke</button>
       <button class="alt" id="btnShare" style="flex:0 0 auto; display:none">Del</button>
     </div>
+    <div id="mapInfo" class="hint" style="text-align:center"></div>
     <div class="slots" id="slots"></div>
     <div id="roomBoard"></div>
     <div id="hostCtl" class="row">
       <button class="grey" id="btnAddBot">+ Legg til bot</button>
       <button class="grey" id="btnDelBot">– Fjern bot</button>
+      <button class="alt" id="btnMap">Brett: Vanlig</button>
     </div>
     <div style="height:12px"></div>
     <button class="big" id="btnStart">Start</button>
