@@ -537,14 +537,16 @@ function onMapChange() {
 // Hele brettet vises alltid (PC, nettbrett og mobil – alltid liggende): brettet skaleres til plassen ved siden av spillerkolonnen
 // (størst mulige ruter som får plass i bredde og høyde). Ingen følgekamera.
 const FIT = { tile: 0, cam: false, key: '' };
+let CGAP = 4;   // mellomrom spillerkolonne–brett: ca. 4 px, litt mer med store ruter (maks 6)
 function fitView() {
   if (!FW) return;
   placeLayout();
   const g = $('game'), gs = getComputedStyle(g), bs = getComputedStyle(document.body), W = (document.documentElement.clientWidth || window.innerWidth) - parseFloat(bs.paddingLeft) - parseFloat(bs.paddingRight), H = window.innerHeight - parseFloat(bs.paddingTop) - parseFloat(bs.paddingBottom);
   const padX = parseFloat(gs.paddingLeft) + parseFloat(gs.paddingRight), padY = parseFloat(gs.paddingTop) + parseFloat(gs.paddingBottom);
   $('playarea').style.height = document.body.classList.contains('touch') ? Math.floor(H - padY) + 'px' : '';   // touch: kolonnen (med styrekorset nederst) går til bunnen av skjermen
-  const SH = 8, colW = colWidth() + 8;   // skygge, spillerkolonne + mellomrom
-  const availW = Math.max(120, W - padX - SH - colW), availH = Math.max(100, H - padY - SH);
+  const SH = 8, colW = colWidth() + CGAP, S = TSLOT();   // skygge, spillerkolonne + mellomrom, fast luke til nedtellingen over brettet
+  $('playarea').style.paddingTop = S + 'px';
+  const availW = Math.max(120, W - padX - SH - colW), availH = Math.max(100, H - padY - SH - S);
   const tile = Math.min(availW / FW, availH / FH);
   // heltallig pikselskalering når det koster under 10 % størrelse
   const dpr = window.devicePixelRatio || 1, t = Math.max(3, Math.floor(tile)), ti = Math.floor(tile * dpr / TS) * TS / dpr;
@@ -554,13 +556,14 @@ function fitView() {
   vctx.imageSmoothingEnabled = false;
   view.w = w; view.h = h; view.x = 0; view.y = 0;
   const key = cssW + 'x' + cssH;
-  if (key !== FIT.key) { FIT.key = key; cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px'; $('wrap').style.width = (cssW + 8) + 'px'; g.style.setProperty('--bw', cssW + 'px'); }
+  if (key !== FIT.key) { FIT.key = key; cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px'; $('wrap').style.width = (cssW + 8) + 'px'; document.body.style.setProperty('--tile', tt + 'px'); CGAP = Math.max(4, Math.min(6, Math.round(tt * .13))); document.body.style.setProperty('--cgap', CGAP + 'px'); document.body.classList.toggle('tall', tt >= 34); g.style.setProperty('--bw', cssW + 'px'); }
   // spillerlista starter på linje med brettets overkant
   const hr = $('hudrow'), cr = cv.getBoundingClientRect(), hrr = hr.getBoundingClientRect();
   // Avslutt (+ rominfo) i feltet til høyre for brettet, toppen på linje med brettets overkant
   const tr = $('topright'); if (cr.height && tr.parentNode === $('game')) { tr.style.top = Math.round(cr.top) + 'px'; tr.style.left = Math.round(cr.right + 14) + 'px'; tr.style.right = 'auto'; }
   const first = [...hr.children].find(e => e.getClientRects().length);
-  if (cr.height && hrr.height && first) { const pt = Math.max(0, Math.round((parseFloat(hr.style.paddingTop) || 0) + cr.top - first.getBoundingClientRect().top)); if (hr.style.paddingTop !== pt + 'px') hr.style.paddingTop = pt + 'px'; }
+  if (cr.height && hrr.height && first) { const pt = Math.max(0, +((parseFloat(hr.style.paddingTop) || 0) + cr.top - first.getBoundingClientRect().top).toFixed(2)); if (Math.abs((parseFloat(hr.style.paddingTop) || 0) - pt) > 0.05) hr.style.paddingTop = pt + 'px'; }
+  placeTimer();
 }
 window.addEventListener('resize', fitView);
 if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if (inGame()) fitView(); }); ro.observe($('hudrow')); }
@@ -1320,6 +1323,15 @@ function frame() {
   requestAnimationFrame(frame);
 }
 let audSnap = null, recorded = '', timerTxt = '';
+// Nedtellingen (siste 30 s) står midt over brettet, i den faste luka mellom skjermtoppen og brettets overkant (skyver ingenting)
+function TSLOT() { return document.body.classList.contains('touch') ? 24 : 34; }
+function placeTimer() {
+  const el = $('timer'); if (!el) return;
+  if (el.parentNode !== document.body) document.body.appendChild(el);
+  const cr = cv.getBoundingClientRect(); if (!cr.height) return;
+  const top0 = parseFloat(getComputedStyle(document.body).paddingTop) || 0;
+  el.style.left = Math.round(cr.left + cr.width / 2) + 'px'; el.style.top = Math.round((top0 + cr.top) / 2) + 'px';
+}
 function updateTimer() {   // nedtelling i HUD-raden: skjult til 0:30 gjenstår, da rød og blinkende
   const el = $('timer'); if (!el) return;
   const s = lastSnap; let txt = '';
@@ -1328,7 +1340,7 @@ function updateTimer() {   // nedtelling i HUD-raden: skjult til 0:30 gjenstår,
     txt = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
     el.classList.toggle('hurry', s.ph === 'play');
   }
-  if (txt !== timerTxt) { timerTxt = txt; el.textContent = txt; el.style.display = txt ? 'block' : 'none'; el.parentNode.style.display = txt ? '' : 'none'; $('hudrow').classList.toggle('tmr', !!txt); }
+  if (txt !== timerTxt) { timerTxt = txt; el.textContent = txt; el.style.display = txt && inGame() ? 'block' : 'none'; if (txt) placeTimer(); }
 }
 function audioEvents(a, s) {
   if (!s || !s.p) return;

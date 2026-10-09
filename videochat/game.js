@@ -512,27 +512,30 @@ ctx.imageSmoothingEnabled = false;
 const view = { x: 0, y: 0, w: cv.width, h: cv.height };   // hele brettet vises
 // Brettet skaleres til plassen ved siden av (eller under) videoflisene: størst mulige ruter, hele brettet synlig.
 const FIT = { tile: 0, key: '' };
+let CGAP = 4;   // mellomrom spillerkolonne–brett: ca. 4 px, litt mer med store ruter (maks 6)
 function fitView() {
   const touch = document.body.classList.contains('touch'), g = $('game'), av = $('avGame'), stage = $('stage');
   const gs = getComputedStyle(g), bs = getComputedStyle(document.body), W = (document.documentElement.clientWidth || window.innerWidth) - parseFloat(bs.paddingLeft) - parseFloat(bs.paddingRight), H = window.innerHeight - parseFloat(bs.paddingTop) - parseFloat(bs.paddingBottom);
   const padX = parseFloat(gs.paddingLeft) + parseFloat(gs.paddingRight), padY = parseFloat(gs.paddingTop) + parseFloat(gs.paddingBottom);
   $('playarea').style.height = document.body.classList.contains('touch') ? Math.floor(H - padY) + 'px' : '';   // touch: kolonnen (med styrekorset nederst) går til bunnen av skjermen
   placeLayout();
-  const top = 0, bar = 0, SH = 8;
+  const top = TSLOT(), bar = 0, SH = 8;   // fast luke til nedtellingen over brettet
+  $('playarea').style.paddingTop = top + 'px';
   const stacked = getComputedStyle(stage).flexDirection.startsWith('column');
   const avW = !stacked && av.offsetWidth ? av.offsetWidth + 12 : 0, avH = stacked && av.offsetHeight ? av.offsetHeight + 6 : 0;
   const FWc = cv.width / TS, FHc = cv.height / TS;
-  const availW = Math.max(120, W - padX - SH - avW - colWidth() - 8), availH = Math.max(100, H - padY - top - bar - SH - avH);
+  const availW = Math.max(120, W - padX - SH - avW - colWidth() - CGAP), availH = Math.max(100, H - padY - top - bar - SH - avH);
   const tile = Math.min(availW / FWc, availH / FHc);
   const dpr = window.devicePixelRatio || 1, t = Math.max(4, Math.floor(tile)), ti = Math.floor(tile * dpr / TS) * TS / dpr;
   const tt = ti >= TS / dpr && ti >= t * 0.9 ? ti : t;
   FIT.tile = tt;
   const cssW = FWc * tt, cssH = FHc * tt, key = cssW + 'x' + cssH + ':' + avW;
-  if (key !== FIT.key) { FIT.key = key; cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px'; $('wrap').style.width = (cssW + 8) + 'px'; $('stage').style.width = stacked ? '' : (cssW + 8 + avW) + 'px'; g.style.setProperty('--bw', (cssW + avW) + 'px'); }
+  if (key !== FIT.key) { FIT.key = key; cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px'; $('wrap').style.width = (cssW + 8) + 'px'; $('stage').style.width = stacked ? '' : (cssW + 8 + avW) + 'px'; document.body.style.setProperty('--tile', tt + 'px'); CGAP = Math.max(4, Math.min(6, Math.round(tt * .13))); document.body.style.setProperty('--cgap', CGAP + 'px'); document.body.classList.toggle('tall', tt >= 34); g.style.setProperty('--bw', (cssW + avW) + 'px'); }
   // spillerlista starter på linje med brettets overkant
   const hr = $('hudrow'), cr = cv.getBoundingClientRect(), hrr = hr.getBoundingClientRect();
   const first = [...hr.children].find(e => e.getClientRects().length);
-  if (cr.height && hrr.height && first) { const pt = Math.max(0, Math.round((parseFloat(hr.style.paddingTop) || 0) + cr.top - first.getBoundingClientRect().top)); if (hr.style.paddingTop !== pt + 'px') hr.style.paddingTop = pt + 'px'; }
+  if (cr.height && hrr.height && first) { const pt = Math.max(0, +((parseFloat(hr.style.paddingTop) || 0) + cr.top - first.getBoundingClientRect().top).toFixed(2)); if (Math.abs((parseFloat(hr.style.paddingTop) || 0) - pt) > 0.05) hr.style.paddingTop = pt + 'px'; }
+  placeTimer();
 }
 window.addEventListener('resize', fitView);
 if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if ($('game').classList.contains('on')) fitView(); }); ro.observe($('hudrow')); ro.observe($('avGame')); }
@@ -1305,6 +1308,15 @@ function frame() {
   requestAnimationFrame(frame);
 }
 let audSnap = null, recorded = '', timerTxt = '';
+// Nedtellingen (siste 30 s) står midt over brettet, i den faste luka mellom skjermtoppen og brettets overkant (skyver ingenting)
+function TSLOT() { return document.body.classList.contains('touch') ? 24 : 34; }
+function placeTimer() {
+  const el = $('timer'); if (!el) return;
+  if (el.parentNode !== document.body) document.body.appendChild(el);
+  const cr = cv.getBoundingClientRect(); if (!cr.height) return;
+  const top0 = parseFloat(getComputedStyle(document.body).paddingTop) || 0;
+  el.style.left = Math.round(cr.left + cr.width / 2) + 'px'; el.style.top = Math.round((top0 + cr.top) / 2) + 'px';
+}
 function updateTimer() {   // nedtelling i HUD-raden: skjult til 0:30 gjenstår, da rød og blinkende
   const el = $('timer'); if (!el) return;
   const s = lastSnap; let txt = '';
@@ -1313,7 +1325,7 @@ function updateTimer() {   // nedtelling i HUD-raden: skjult til 0:30 gjenstår,
     txt = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
     el.classList.toggle('hurry', s.ph === 'play');
   }
-  if (txt !== timerTxt) { timerTxt = txt; el.textContent = txt; el.style.display = txt ? 'block' : 'none'; el.parentNode.style.display = txt ? '' : 'none'; $('hudrow').classList.toggle('tmr', !!txt); }
+  if (txt !== timerTxt) { timerTxt = txt; el.textContent = txt; el.style.display = txt && inGame() ? 'block' : 'none'; if (txt) placeTimer(); }
 }
 function audioEvents(a, s) {
   if (!s || !s.p) return;

@@ -75,10 +75,12 @@
   body.touch.tside #touch > * { pointer-events:auto; }
   /* PC: spillerliste i kolonne til venstre for brettet (body.lcol settes i game.js) */
   .hp em { display:none; font-style:normal; }
-  body.lcol #playarea { display:flex; gap:8px; justify-content:safe center; align-items:stretch; }
+  body.lcol #playarea { display:flex; gap:var(--cgap, 4px); justify-content:safe center; align-items:stretch; }
   body.lcol #hudrow { display:flex; flex-direction:column; gap:8px; flex:0 0 200px; width:200px; max-width:none; margin:0; }
   body.lcol #hudrow > div:first-child:empty, body.lcol #hudrow > div:first-child:has(#timer[style*="display: none"]) { display:none; }
-  body.lcol #timer { font-size:34px; min-width:0; text-align:left; padding:0 2px; }
+  body #timer { position:fixed; z-index:7; transform:translate(-50%,-50%); font-size:30px; min-width:0; text-align:center; padding:0 2px; margin:0; white-space:nowrap; pointer-events:none; }   /* midt over brettet (plasseres av placeTimer) */
+  body[data-screen]:not([data-screen=game]) #timer { display:none !important; }
+  body.lcol #hud, body.lcol #hud.many { align-self:stretch; width:100%; }   /* radene fyller kolonnen helt inn mot brettet */
   body.lcol #hud, body.lcol #hud.many { flex-direction:column; flex-wrap:nowrap; justify-content:flex-start; padding:0; margin:0; gap:6px; font-size:14px; }
   body.lcol #hud .hp, body.lcol #hud.many .hp { display:grid; grid-template-columns: 14px 1fr auto; grid-template-areas: "i b e" "s s s"; gap:3px 8px; padding:6px 8px; }
   body.lcol #hud .hp i { grid-area:i; width:14px; height:14px; align-self:center; }
@@ -97,7 +99,7 @@
   body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }   /* hakk/hjemlinje */
   body.touch #game.screen { padding: 6px calc(var(--bomb) + 26px) 6px 8px; }
   body.touch.lcol #hudrow { flex:0 0 calc(var(--dp) * 3 + 8px); width:calc(var(--dp) * 3 + 8px); gap:6px; }
-  body.touch.lcol #timer { font-size:20px; }
+  body.touch #timer { font-size:20px; }
   /* spillerlista: én spiller per rad, øverst på linje med brettet (padding-top settes i fitView), like høye rader ned mot styrekorset */
   body.lcol #hud, body.lcol #hud.many { flex:1 1 auto; min-height:0; }
   body.lcol #hud .hp, body.lcol #hud.many .hp { flex:0 0 auto; align-content:center; overflow:hidden; }   /* faste, kompakte rader (ingen strekking) */
@@ -297,6 +299,15 @@
     text-shadow:-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 2px 2px 0 #000; }   /* knallrød pikseltekst, ingen boks */
   #timer.hurry { color:#ff2b2b; animation: bbxblink .5s steps(2) infinite; }
   @keyframes bbxblink { 50% { opacity:.3; } }
+  /* Spillerrader = én brettrute høye, på linje med brettets ruterader (1 px skille), tekst skaleres til raden */
+  body.lcol #hud, body.lcol #hud.many, body.touch.lcol #hud, body.touch.lcol #hud.many { gap:1px; }
+  body.lcol #hud .hp, body.lcol #hud.many .hp, body.touch.lcol #hud .hp, body.touch.lcol #hud.many .hp { height:calc(var(--tile, 36px) - 1px); min-height:0; max-height:none; box-sizing:border-box; padding:0 clamp(3px, calc(var(--tile, 36px) * .18), 8px); border-width:1px;
+    grid-template-columns:clamp(6px, calc(var(--tile, 36px) * .32), 14px) 1fr auto; grid-template-areas:"i b e"; gap:0 clamp(3px, calc(var(--tile, 36px) * .18), 8px); align-items:center; align-content:center;
+    font-size:clamp(8px, calc(var(--tile, 36px) * .42), 16px); line-height:1.05; }
+  body.lcol #hud .hp i, body.touch.lcol #hud .hp i { width:clamp(6px, calc(var(--tile, 36px) * .32), 14px); height:clamp(6px, calc(var(--tile, 36px) * .32), 14px); }
+  body.lcol #hud .hp span { display:none; }
+  body.lcol.tall:not(.touch) #hud .hp { grid-template-areas:"i b e" "s s s"; align-content:center; row-gap:1px; }
+  body.lcol.tall:not(.touch) #hud .hp span { display:block; font-size:clamp(9px, calc(var(--tile, 36px) * .28), 12px); line-height:1; white-space:nowrap; overflow:hidden; }
 </style>
 </head>
 <body data-screen="menu">
