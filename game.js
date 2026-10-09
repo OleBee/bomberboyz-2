@@ -834,7 +834,7 @@ function myName() {
   try { if (n && !isDefaultName(n)) localStorage.setItem('bk-name', n); else localStorage.removeItem('bk-name'); } catch (e) { }
   return n || 'Spiller';
 }
-function show(id) { document.body.dataset.screen = id; if (id === 'menu') BBX.renderMenu(); document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
+function show(id) { document.body.dataset.screen = id; BBX.dock(id); if (id === 'menu') BBX.renderMenu(); document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
 function menuErr(t) { $('menuErr').textContent = t || ''; }
 function genCode() { let s = ''; for (let i = 0; i < 5; i++) s += CODE_ABC[Math.floor(Math.random() * CODE_ABC.length)]; return s; }
 function parseCode(v) {

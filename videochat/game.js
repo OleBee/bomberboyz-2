@@ -786,7 +786,7 @@ function myName() {
   try { if (n && !isDefaultName(n)) localStorage.setItem('bk-name', n); else localStorage.removeItem('bk-name'); } catch (e) { }
   return n || 'Spiller';
 }
-function show(id) { document.body.dataset.screen = id;
+function show(id) { document.body.dataset.screen = id; BBX.dock(id);
   if (id === 'menu') BBX.renderMenu();
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
   const bar = $('avbar'), dest = id === 'game' ? $('avGame') : id === 'lobby' ? $('avLobby') : null;

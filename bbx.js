@@ -357,24 +357,23 @@ window.BBX = (() => {
   .bbx-tab td.nm em { font-style:normal; font-size:10px; background:#b8bec8; color:#111; text-shadow:none; padding:1px 4px; margin-left:6px; vertical-align:2px; }
   .bbx-empty { text-align:center; padding:10px 4px; color:#dfe6ff; font-size:14px; line-height:1.5; }
   #over .bbx-board { margin:10px 0 14px; padding:10px; }
-  /* Beste spillere: fast kolonne til venstre på brede skjermer (meny, lobby og spill) */
+  /* Beste spillere: på startskjermen ligger listen i menyrammen (#lbSlot). I lobbyen flyttes den ut
+     som fast kolonne til venstre på brede skjermer; skjult mens det spilles og i lobbyen på smale skjermer. */
+  #lbSlot #lbPanel h2 { font-size:19px; }
+  #lbSlot #lbPanel #lbTabs button { font-size:12px; padding:6px 4px; }
+  #lbSlot #lbPanel .bbx-tab { font-size:14px; }
+  #lbSlot #lbPanel .bbx-tab td { padding:5px 4px; }
+  #lbSlot #lbPanel .bbx-tab th { padding:2px 4px 6px; font-size:10px; }
+  #lbSlot #lbPanel .bbx-tab td.nm { max-width:9em; }
+  #lbSlotLobby #lbPanel h2 { font-size:19px; }
+  #lbSlotLobby #lbPanel #lbTabs button { font-size:12px; padding:6px 4px; }
+  #lbSlotLobby #lbPanel .bbx-tab { font-size:14px; }
+  #lbSlotLobby #lbPanel .bbx-tab td { padding:5px 4px; }
+  #lbSlotLobby #lbPanel .bbx-tab th { padding:2px 4px 6px; font-size:10px; }
+  #lbSlotLobby #lbPanel .bbx-tab td.nm { max-width:9em; }
+  body > #lbPanel { display:none; }   /* utenfor start/lobby (under spill) vises listen ikke */
   @media (min-width: 1100px) {
-    body:not([data-screen="game"]) { padding-left: 290px; }
-    body[data-screen="game"] #lbPanel { display:none; }   /* bare på start- og lobbyskjermen, ikke mens det spilles */
-    #lbPanel { position:fixed; left:14px; top:14px; width:262px; max-height:calc(100vh - 36px); overflow:auto; margin:0; z-index:5; padding:12px 10px 8px; }
-    #lbPanel h2 { font-size:18px; }
-    #lbPanel #lbTabs button { font-size:12px; padding:6px 4px; }
-    #lbPanel .bbx-tab { font-size:13px; }
-    #lbPanel .bbx-tab td { padding:4px 3px; }
-    #lbPanel .bbx-tab th { padding:2px 3px 5px; font-size:10px; }
-    #lbPanel .bbx-tab td.w { font-size:15px; }
-    #lbPanel .bbx-tab td.nm { max-width:8.5em; }
-    #bbxSnd { top:auto; right:auto; left:14px; bottom:14px; }   /* lydknappen i venstre kolonne, unna videorutene */
-  }
-  /* Smale skjermer: under menyen, skjult i lobby og spill */
-  @media (max-width: 1099px) {
-    #lbPanel { width:calc(100% - 40px); max-width:720px; }
-    body:not([data-screen="menu"]) #lbPanel { display:none; }
+    body[data-screen="game"] #bbxSnd { top:auto; right:auto; left:14px; bottom:14px; }   /* unna videorutene */
   }
   #over .bbx-board h2 { font-size:16px; }
   #over .bbx-tab { font-size:15px; margin:0; }
@@ -394,6 +393,7 @@ window.BBX = (() => {
 
   return {
     init, music, jingle, sfx, toggleMute, cycleVol, get sound() { return Object.assign({}, snd); },
+    dock(id) { const el = $('lbPanel'), slot = $('lbSlot'); if (!el) return; const lob = $('lbSlotLobby'); const to = id === 'menu' && slot ? slot : id === 'lobby' && lob ? lob : document.body; if (el.parentNode !== to) to.appendChild(el); },
     recordLocal, localTop, submitGlobal, globalTop, get globalOn() { return globalOn; }, table, renderMenu,
     get debug() { return Object.assign({ ctx: ctx ? ctx.state : 'none' }, dbg); },
   };
