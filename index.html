@@ -124,6 +124,7 @@
   #topright { display:none; }
   body[data-screen=game] #topright { display:grid; grid-template-columns:auto; gap:5px 6px; align-items:center; justify-items:end; position:fixed; z-index:6;
     top:calc(8px + env(safe-area-inset-top)); right:calc(8px + env(safe-area-inset-right)); }
+  #game > #topright { justify-items:start; }
   #topright #netInfo { grid-column:1 / -1; font-size:11px; opacity:.75; white-space:nowrap; }
   #topright #netInfo:empty { display:none; }
   #topright #btnQuit { font-size:12px; padding:5px 8px; }

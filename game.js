@@ -558,6 +558,8 @@ function fitView() {
   if (key !== FIT.key) { FIT.key = key; cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px'; $('wrap').style.width = (cssW + 8) + 'px'; g.style.setProperty('--bw', cssW + 'px'); }
   // spillerlista starter på linje med brettets overkant
   const hr = $('hudrow'), cr = cv.getBoundingClientRect(), hrr = hr.getBoundingClientRect();
+  // Avslutt (+ rominfo) i feltet til høyre for brettet, toppen på linje med brettets overkant
+  const tr = $('topright'); if (cr.height && tr.parentNode === $('game')) { tr.style.top = Math.round(cr.top) + 'px'; tr.style.left = Math.round(cr.right + 14) + 'px'; tr.style.right = 'auto'; }
   const first = [...hr.children].find(e => e.getClientRects().length);
   if (cr.height && hrr.height && first) { const pt = Math.max(0, Math.round((parseFloat(hr.style.paddingTop) || 0) + cr.top - first.getBoundingClientRect().top)); if (hr.style.paddingTop !== pt + 'px') hr.style.paddingTop = pt + 'px'; }
 }
