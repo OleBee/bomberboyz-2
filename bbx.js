@@ -281,6 +281,7 @@ window.BBX = (() => {
   // Bare verten sender, bare rom med minst to mennesker, og serveren validerer og begrenser.
   async function submitGlobal(room, round, players) {
     if (!globalOn) return;
+    try { if (localStorage.getItem('bk-test') === '1' || navigator.webdriver) return; } catch (e) { }   // automatiske tester/robotnettlesere sender ikke inn   // automatiske tester sender ikke inn
     const humans = players.filter(p => !p.bot).map(p => ({ name: cleanName(p.name), win: !!p.win, kills: Math.max(0, Math.min(7, p.kills | 0)) }));
     if (humans.length < 2 || !room) return;
     const body = { p_room: String(room).slice(0, 8), p_round: round | 0, p_players: humans };
@@ -356,6 +357,25 @@ window.BBX = (() => {
   .bbx-tab td.nm em { font-style:normal; font-size:10px; background:#b8bec8; color:#111; text-shadow:none; padding:1px 4px; margin-left:6px; vertical-align:2px; }
   .bbx-empty { text-align:center; padding:10px 4px; color:#dfe6ff; font-size:14px; line-height:1.5; }
   #over .bbx-board { margin:10px 0 14px; padding:10px; }
+  /* Beste spillere: fast kolonne til venstre på brede skjermer (meny, lobby og spill) */
+  @media (min-width: 1100px) {
+    body:not([data-screen="game"]) { padding-left: 290px; }
+    body[data-screen="game"] #lbPanel { display:none; }   /* bare på start- og lobbyskjermen, ikke mens det spilles */
+    #lbPanel { position:fixed; left:14px; top:14px; width:262px; max-height:calc(100vh - 36px); overflow:auto; margin:0; z-index:5; padding:12px 10px 8px; }
+    #lbPanel h2 { font-size:18px; }
+    #lbPanel #lbTabs button { font-size:12px; padding:6px 4px; }
+    #lbPanel .bbx-tab { font-size:13px; }
+    #lbPanel .bbx-tab td { padding:4px 3px; }
+    #lbPanel .bbx-tab th { padding:2px 3px 5px; font-size:10px; }
+    #lbPanel .bbx-tab td.w { font-size:15px; }
+    #lbPanel .bbx-tab td.nm { max-width:8.5em; }
+    #bbxSnd { top:auto; right:auto; left:14px; bottom:14px; }   /* lydknappen i venstre kolonne, unna videorutene */
+  }
+  /* Smale skjermer: under menyen, skjult i lobby og spill */
+  @media (max-width: 1099px) {
+    #lbPanel { width:calc(100% - 40px); max-width:720px; }
+    body:not([data-screen="menu"]) #lbPanel { display:none; }
+  }
   #over .bbx-board h2 { font-size:16px; }
   #over .bbx-tab { font-size:15px; margin:0; }
   #over .bbx-tab td { text-align:right; border-bottom:none; padding:5px 6px; }

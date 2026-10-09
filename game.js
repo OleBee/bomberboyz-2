@@ -37,6 +37,20 @@ const COLORS = [
 const PEER_PREFIX = 'bomberboyz2-v1-';
 const CODE_ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const $ = id => document.getElementById(id);
+// ---------- Nett-takt ----------
+// Simuleringen går i faste steg på 1/60 s. Verten sender tilstand 30 ganger i sekundet,
+// klienten forutsier sin egen figur og viser de andre litt bak sanntid (INTERP) for jevn bevegelse.
+const STEP = 1 / 60, SEND_DT = 1 / 30, INTERP = 0.075;
+// Posisjoner går på en egen upålitelig, uordnet datakanal («bbfast»): en tapt eller forsinket
+// tilstand er uansett utdatert når neste kommer. Lobby, velkomst og bombetrykk går også pålitelig.
+if (window.RTCPeerConnection && !RTCPeerConnection.prototype.__bbFast) {
+  const cdc = RTCPeerConnection.prototype.createDataChannel;
+  RTCPeerConnection.prototype.createDataChannel = function (label, opts) {
+    if (String(label).startsWith('bbfast')) opts = Object.assign({}, opts, { ordered: false, maxRetransmits: 0 });
+    return cdc.call(this, label, opts);
+  };
+  RTCPeerConnection.prototype.__bbFast = true;
+}
 
 // ---------- Fargehjelp ----------
 function shade(hex, f) {
@@ -481,13 +495,13 @@ function botThink(g, p, dt) {
 // ---------- Tilstand som sendes over nett ----------
 function snapshot(g) {
   return {
-    t: 's', mp: mapId, ph: g.phase, g: g.grid.join(''), tm: +g.time.toFixed(2), ex: g.exCount, w: g.winner,
+    t: 's', sq: ++snapSeq, mp: mapId, ph: g.phase, g: g.grid.join(''), tm: +g.time.toFixed(2), ex: g.exCount, w: g.winner,
     b: g.bombs.map(b => { const d = b.slide ? DIRS[b.slide] : [0, 0];
       return [b.x, b.y, +b.t.toFixed(2), +(d[0] * b.prog).toFixed(3), +(d[1] * b.prog).toFixed(3), b.id]; }),
     f: [...g.flames].map(([i, f]) => [i, f.k, +f.t.toFixed(2)]),
     x: [...g.burning].map(([i, w]) => [i, +w.t.toFixed(2)]),
     p: g.players.map(p => [p.slot, +p.x.toFixed(3), +p.y.toFixed(3), p.alive ? 1 : 0, p.dir[0],
-      p.moving ? 1 : 0, +p.deathT.toFixed(2), p.maxBombs, p.range, p.speedLv, p.name, p.bot ? 1 : 0, p.glove ? 1 : 0, g.kills[p.slot] || 0]),
+      p.moving ? 1 : 0, +p.deathT.toFixed(2), p.maxBombs, p.range, p.speedLv, p.name, p.bot ? 1 : 0, p.glove ? 1 : 0, g.kills[p.slot] || 0, p.ack || 0, p.ackN || 0]),
     sc: room.scores.slice(), rn: room.round, lb: boardArr(),
   };
 }
@@ -530,8 +544,130 @@ function present(dt) {
   view.x += (tx - view.x) * k; view.y += (ty - view.y) * k;
   vctx.drawImage(world, Math.round(view.x), Math.round(view.y), view.w, view.h, 0, 0, view.w, view.h);
 }
-const disp = {}; // glattede posisjoner per spiller
-const dispB = {}; // glattede posisjoner per bombe
+const disp = {}; // hvor hver figur tegnes i dette bildet
+const dispB = {}; // hvor hver bombe tegnes
+// ---------- Klient: forutsigelse av egen figur og interpolering av de andre ----------
+const pr = { on: false, x: 0, y: 0, dir: 'down', moving: false, speedLv: 0, glove: false, input: { dir: null, bomb: false }, ex: 0, ey: 0 };
+const rp = { x: 0, y: 0, dir: 'down', moving: false, speedLv: 0, glove: false, input: { dir: null, bomb: false } };
+const HN = 512, hq = new Int32Array(HN), hd = new Array(HN).fill(null);   // ringbuffer med egne input-steg
+let hHead = 0, hLen = 0;
+const pg = {   // «brett» for forutsigelse: bygger på siste tilstand fra verten
+  s: null,
+  cell(x, y) { return (x < 0 || y < 0 || x >= COLS || y >= ROWS) ? '#' : this.s.g[y * COLS + x]; },
+  bombAt(x, y) { const b = this.s.b; for (let i = 0; i < b.length; i++) if (b[i][0] === x && b[i][1] === y) return b[i]; return null; },
+  passable(x, y, p) {
+    const c = this.cell(x, y); if (c === '#' || c === 'w' || c === 'x') return false;
+    return !this.bombAt(x, y) || (Math.abs(p.x - x) < 0.98 && Math.abs(p.y - y) < 0.98);
+  },
+  speed(p) { return Game.prototype.speed(p); },
+  kick() { },
+};
+const sbuf = [];   // siste tilstander fra verten (for interpolering)
+let toff = null, lastSq = 0;
+function resetPrediction() { pr.on = false; hLen = 0; sbuf.length = 0; toff = null; lastSq = 0; }
+function predictStep(q, dir) {
+  if (!pr.on || !pg.s) return;
+  pr.input.dir = dir; movePlayer(pg, pr, STEP);
+  if (hLen === HN) { hHead = (hHead + 1) % HN; hLen--; }
+  const i = (hHead + hLen) % HN; hq[i] = q; hd[i] = dir; hLen++;
+}
+function reconcile(s) {
+  let me = null; for (const p of s.p) if (p[0] === mySlot) { me = p; break; }
+  if (!me || !me[3] || s.ph !== 'play' || s.tm < READY_TIME) { pr.on = false; hLen = 0; return; }
+  pg.s = s; pr.speedLv = me[9]; pr.glove = !!me[12];
+  // steg verten allerede har simulert: alt til og med siste mottatte input, pluss stegene etter den
+  const upto = (me[14] || 0) + (me[15] || 0);
+  while (hLen && hq[hHead] <= upto) { hHead = (hHead + 1) % HN; hLen--; }
+  if (!pr.on) { pr.on = true; pr.x = me[1]; pr.y = me[2]; pr.dir = DIRKEY[me[4]] || 'down'; pr.ex = pr.ey = 0; hLen = 0; return; }
+  rp.x = me[1]; rp.y = me[2]; rp.dir = pr.dir; rp.speedLv = pr.speedLv; rp.glove = pr.glove;
+  for (let i = 0; i < hLen; i++) { rp.input.dir = hd[(hHead + i) % HN]; movePlayer(pg, rp, STEP); }
+  const dx = pr.x - rp.x, dy = pr.y - rp.y;
+  pr.x = rp.x; pr.y = rp.y;
+  if (Math.abs(dx) + Math.abs(dy) > 1.5) pr.ex = pr.ey = 0;   // stor avvik (f.eks. teleport): hopp rett dit
+  else { pr.ex += dx; pr.ey += dy; }                         // små avvik glattes ut over noen bilder
+}
+function onClientSnap(d) {
+  const now = performance.now() / 1000, last = sbuf[sbuf.length - 1];
+  if (last && (last.rn !== d.rn || d.tm < last.tm)) { sbuf.length = 0; toff = null; }
+  sbuf.push(d); if (sbuf.length > 20) sbuf.shift();
+  const sample = d.tm - now;   // vertens klokke minus vår; den høyeste verdien har minst nettforsinkelse
+  toff = toff === null ? sample : sample > toff ? sample : toff + (sample - toff) * 0.02;
+  reconcile(d);
+}
+function findP(s, slot) { for (const p of s.p) if (p[0] === slot) return p; return null; }
+function findB(s, id) { for (const b of s.b) if (b[5] === id) return b; return null; }
+function setD(map, k, x, y) { const d = map[k]; if (d) { d.x = x; d.y = y; } else map[k] = { x, y }; }
+// Regner ut hvor alle figurer og bomber skal tegnes i dette bildet
+function updatePositions(s, now, dt) {
+  const client = net.role === 'client';
+  let a = null, b = null, f = 0;
+  if (client && sbuf.length && toff !== null) {
+    const rt = now + toff - INTERP;
+    a = b = sbuf[0];
+    if (rt >= sbuf[sbuf.length - 1].tm) a = b = sbuf[sbuf.length - 1];
+    else if (rt > sbuf[0].tm) for (let i = sbuf.length - 2; i >= 0; i--) if (sbuf[i].tm <= rt) { a = sbuf[i]; b = sbuf[i + 1]; f = b.tm > a.tm ? (rt - a.tm) / (b.tm - a.tm) : 0; break; }
+  }
+  const k = Math.exp(-dt * 12); pr.ex *= k; pr.ey *= k;
+  for (const p of s.p) {
+    const slot = p[0]; let x = p[1], y = p[2];
+    if (client) {
+      if (slot === mySlot && pr.on) { x = pr.x + pr.ex; y = pr.y + pr.ey; }
+      else if (a) {
+        const pa = findP(a, slot), pb = findP(b, slot);
+        if (pa && pb && Math.abs(pb[1] - pa[1]) < 2 && Math.abs(pb[2] - pa[2]) < 2) { x = pa[1] + (pb[1] - pa[1]) * f; y = pa[2] + (pb[2] - pa[2]) * f; }
+      }
+    }
+    setD(disp, slot, x, y);
+  }
+  for (const bm of s.b) {
+    const id = bm[5]; let x = bm[0] + (bm[3] || 0), y = bm[1] + (bm[4] || 0);
+    if (client && a && id != null) {
+      const ba = findB(a, id), bb = findB(b, id);
+      if (ba && bb) { const ax = ba[0] + (ba[3] || 0), ay = ba[1] + (ba[4] || 0); x = ax + (bb[0] + (bb[3] || 0) - ax) * f; y = ay + (bb[1] + (bb[4] || 0) - ay) * f; }
+    }
+    if (id != null) setD(dispB, id, x, y);
+  }
+  if (window.__bbm) { window.__me = disp[mySlot]; window.__disp0 = () => disp[0] ? disp[0].x : NaN; }
+}
+
+// ---------- Statisk bakgrunn: tegnes én gang og oppdateres bare der brettet endrer seg ----------
+let bg = null, bgx = null, bgGrid = '', bgMark = null;
+function tallAt(g, x, y) {
+  if (x < 0 || y < 0 || x >= COLS || y >= ROWS) return true;
+  const c = g.charCodeAt(y * COLS + x); return c === 35 || c === 119 || c === 120;   // '#', 'w', 'x'
+}
+function bgTile(g, x, y) {
+  const c = g[y * COLS + x], px = (x + 1) * TS, py = (y + 1) * TS;
+  if (c === '#') { bgx.drawImage(SPR.solid, px, py); return; }
+  if (c === 'w') { bgx.drawImage(SPR.wall, px, py); return; }
+  bgx.drawImage(SPR.floor, px, py);
+  bgx.fillStyle = 'rgba(0,30,8,0.45)';
+  const up = tallAt(g, x, y - 1);
+  if (up) bgx.fillRect(px, py, 16, 3);
+  if (tallAt(g, x - 1, y)) bgx.fillRect(px, py + (up ? 3 : 2), 3, 16 - (up ? 3 : 2));
+  if (c === 'B' || c === 'F' || c === 'S' || c === 'G') bgx.drawImage(SPR['p' + c], px, py);
+}
+function updateBg(g) {
+  if (!bg || bg.width !== FW * TS || bg.height !== FH * TS) {
+    bg = mk(FW * TS, FH * TS); bgx = bg.getContext('2d'); bgx.imageSmoothingEnabled = false;
+    bgGrid = ''; bgMark = new Uint8Array(N);
+    for (let fy = 0; fy < FH; fy++) for (let fx = 0; fx < FW; fx++)
+      if (fx === 0 || fy === 0 || fx === FW - 1 || fy === FH - 1) bgx.drawImage(SPR.frame, fx * TS, fy * TS);
+  }
+  if (g === bgGrid) return;
+  if (bgGrid.length !== g.length) { for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) bgTile(g, x, y); }
+  else {
+    bgMark.fill(0);
+    for (let i = 0; i < N; i++) if (g.charCodeAt(i) !== bgGrid.charCodeAt(i)) {
+      bgMark[i] = 1; if (i % COLS < COLS - 1) bgMark[i + 1] = 1; if (i + COLS < N) bgMark[i + COLS] = 1;   // skyggen faller mot høyre/ned
+    }
+    for (let i = 0; i < N; i++) if (bgMark[i]) bgTile(g, i % COLS, (i / COLS) | 0);
+  }
+  bgGrid = g;
+}
+const psort = [];
+const byY = (a, b) => (disp[a[0]] ? disp[a[0]].y : a[2]) - (disp[b[0]] ? disp[b[0]].y : b[2]);
+
 function circle(c, cx, cy, r, col) {
   c.fillStyle = col;
   for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) {
@@ -583,54 +719,40 @@ function drawFlame(px, py, k, t, now) {
 function render(s, now, dt) {
   if (!s) return;
   ctx.imageSmoothingEnabled = false;
-  for (let fy = 0; fy < FH; fy++) for (let fx = 0; fx < FW; fx++) {
-    if (fx === 0 || fy === 0 || fx === FW - 1 || fy === FH - 1) ctx.drawImage(SPR.frame, fx * TS, fy * TS);
-  }
-  const g = s.g;
-  const tall = (x, y) => (x < 0 || y < 0 || x >= COLS || y >= ROWS) ? true : '#wx'.includes(g[y * COLS + x]);
-  const burnT = {}; for (const [i, t] of s.x) burnT[i] = t;
-  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
-    const c = g[y * COLS + x], px = (x + 1) * TS, py = (y + 1) * TS;
-    if (c === '#') { ctx.drawImage(SPR.solid, px, py); continue; }
-    if (c === 'w') { ctx.drawImage(SPR.wall, px, py); continue; }
-    ctx.drawImage(SPR.floor, px, py);
-    ctx.fillStyle = 'rgba(0,30,8,0.45)';
-    if (tall(x, y - 1)) ctx.fillRect(px, py, 16, 3);
-    if (tall(x - 1, y)) ctx.fillRect(px, py + (tall(x, y - 1) ? 3 : 2), 3, 16 - (tall(x, y - 1) ? 3 : 2));
-    if (c === 'x') {
-      const t = burnT[y * COLS + x] || 0, life = t / BURN_TIME;
-      ctx.globalAlpha = life; ctx.drawImage(SPR.wall, px, py); ctx.globalAlpha = 1;
-      const fl = Math.floor(now * 24) % 2;
-      ctx.fillStyle = fl ? '#ff9020' : '#e8401a';
-      for (let i = 0; i < 10; i++) {
-        const a = (i * 37 + Math.floor(now * 20) * 11) % 16, b = (i * 53 + Math.floor(now * 20) * 7) % 16;
-        ctx.fillRect(px + a, py + b, 2, 2);
-      }
-      ctx.fillStyle = 'rgba(255,200,60,' + (0.5 * life).toFixed(2) + ')'; ctx.fillRect(px + 2, py + 2, 12, 12);
-    } else if (c === 'B' || c === 'F' || c === 'S' || c === 'G') ctx.drawImage(SPR['p' + c], px, py);
-  }
-  const seen = new Set();
-  for (const [bx, by, t, ox = 0, oy = 0, id] of s.b) {
-    let x = bx + ox, y = by + oy;
-    if (id != null) {   // glatt glidning hos klienter (snapshot kommer 20 ganger i sekundet)
-      seen.add(id);
-      let d = dispB[id];
-      if (!d || Math.abs(d.x - x) > 2 || Math.abs(d.y - y) > 2) d = dispB[id] = { x, y };
-      const k = net.role === 'client' ? Math.min(1, dt * 18) : 1;
-      d.x += (x - d.x) * k; d.y += (y - d.y) * k; x = d.x; y = d.y;
+  updateBg(s.g);
+  const vx = Math.max(0, Math.floor(view.x)), vy = Math.max(0, Math.floor(view.y));
+  const vw = Math.min(bg.width - vx, view.w + 1), vh = Math.min(bg.height - vy, view.h + 1);
+  ctx.drawImage(bg, vx, vy, vw, vh, vx, vy, vw, vh);
+  const vis = (px, py) => px > vx - 24 && px < vx + vw + 8 && py > vy - 24 && py < vy + vh + 8;
+  for (const [i, t] of s.x) {   // brennende vegger (animert)
+    const px = (i % COLS + 1) * TS, py = (((i / COLS) | 0) + 1) * TS;
+    if (!vis(px, py)) continue;
+    const life = t / BURN_TIME;
+    ctx.globalAlpha = life; ctx.drawImage(SPR.wall, px, py); ctx.globalAlpha = 1;
+    const fl = Math.floor(now * 24) % 2;
+    ctx.fillStyle = fl ? '#ff9020' : '#e8401a';
+    for (let j = 0; j < 10; j++) {
+      const a = (j * 37 + Math.floor(now * 20) * 11) % 16, b = (j * 53 + Math.floor(now * 20) * 7) % 16;
+      ctx.fillRect(px + a, py + b, 2, 2);
     }
-    drawBomb(Math.round((x + 1) * TS), Math.round((y + 1) * TS), t, now);
+    ctx.fillStyle = 'rgba(255,200,60,' + (0.5 * life).toFixed(2) + ')'; ctx.fillRect(px + 2, py + 2, 12, 12);
   }
-  for (const id in dispB) if (!seen.has(+id)) delete dispB[id];
+  for (const bm of s.b) {
+    const d = bm[5] != null ? dispB[bm[5]] : null;
+    const x = d ? d.x : bm[0] + (bm[3] || 0), y = d ? d.y : bm[1] + (bm[4] || 0);
+    const px = Math.round((x + 1) * TS), py = Math.round((y + 1) * TS);
+    if (vis(px, py)) drawBomb(px, py, bm[2], now);
+  }
   for (const [i, k, t] of s.f) drawFlame((i % COLS + 1) * TS, (((i / COLS) | 0) + 1) * TS, k, t, now);
-  const ps = s.p.slice().sort((a, b) => (disp[a[0]] ? disp[a[0]].y : a[2]) - (disp[b[0]] ? disp[b[0]].y : b[2]));
-  for (const p of ps) {
-    const [slot, x, y, alive, dch, moving, deathT] = p;
-    let d = disp[slot];
-    if (!d || Math.abs(d.x - x) > 2 || Math.abs(d.y - y) > 2) d = disp[slot] = { x, y };
-    const k = net.role === 'client' ? Math.min(1, dt * 18) : 1;
-    d.x += (x - d.x) * k; d.y += (y - d.y) * k;
+  psort.length = 0; for (const p of s.p) psort.push(p);
+  psort.sort(byY);
+  for (const p of psort) {
+    const slot = p[0], alive = p[3], deathT = p[6];
+    let dch = p[4], moving = p[5];
+    if (slot === mySlot && pr.on && net.role === 'client') { dch = pr.dir[0]; moving = pr.moving ? 1 : 0; }
+    const d = disp[slot] || { x: p[1], y: p[2] };
     const px = Math.round((d.x + 1) * TS), py = Math.round((d.y + 1) * TS);
+    if (!vis(px, py)) continue;
     if (!alive) {
       if (deathT > 1.1) continue;
       if (Math.floor(deathT * 12) % 2) continue;
@@ -679,7 +801,7 @@ if (window.matchMedia && matchMedia('(pointer: coarse)').matches) document.body.
 window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
 
 // ---------- Rom og nettverk ----------
-const net = { role: 'none', peer: null, conns: new Map(), hostConn: null };
+const net = { role: 'none', peer: null, conns: new Map(), hostConn: null, fast: new Map(), hostFast: null };
 const room = { code: '', members: [], scores: new Array(MAXP).fill(0), phase: 'lobby', map: 'small', board: {}, lb: [], round: 0 };
 // Rommets toppliste: verten teller seire/runder/drap per navn så lenge rommet lever
 function boardArr() {
@@ -712,7 +834,7 @@ function myName() {
   try { if (n && !isDefaultName(n)) localStorage.setItem('bk-name', n); else localStorage.removeItem('bk-name'); } catch (e) { }
   return n || 'Spiller';
 }
-function show(id) { if (id === 'menu') BBX.renderMenu(); document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
+function show(id) { document.body.dataset.screen = id; if (id === 'menu') BBX.renderMenu(); document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
 function menuErr(t) { $('menuErr').textContent = t || ''; }
 function genCode() { let s = ''; for (let i = 0; i < 5; i++) s += CODE_ABC[Math.floor(Math.random() * CODE_ABC.length)]; return s; }
 function parseCode(v) {
@@ -726,7 +848,8 @@ function shareUrl() { return location.origin + location.pathname + '?rom=' + roo
 
 function resetNet() {
   try { if (net.peer) net.peer.destroy(); } catch (e) { }
-  net.role = 'none'; net.peer = null; net.conns.clear(); net.hostConn = null;
+  net.role = 'none'; net.peer = null; net.conns.clear(); net.hostConn = null; net.fast.clear(); net.hostFast = null;
+  resetPrediction();
   game = null; lastSnap = null; room.members = []; room.scores = new Array(MAXP).fill(0); room.phase = 'lobby'; room.code = ''; room.map = 'small'; room.board = {}; room.lb = []; room.round = 0;
   for (const k in disp) delete disp[k];
 }
@@ -769,6 +892,13 @@ function startHosting(offline) {
     });
     peer.on('disconnected', () => { if (net.peer === peer && !peer.destroyed) setTimeout(() => { try { peer.reconnect(); } catch (e) { } }, 1000); });
     peer.on('connection', conn => {
+      if (String(conn.label || '').startsWith('bbfast')) {   // rask kanal for input/tilstand
+        conn.on('open', () => net.fast.set(conn.peer, conn));
+        conn.on('data', d => { if (d && d.t === 'in') hostOnData(conn, d); });
+        const drop = () => { if (net.fast.get(conn.peer) === conn) net.fast.delete(conn.peer); };
+        conn.on('close', drop); conn.on('error', drop);
+        return;
+      }
       conn.on('data', d => hostOnData(conn, d));
       conn.on('close', () => hostDrop(conn));
       conn.on('error', () => hostDrop(conn));
@@ -800,16 +930,19 @@ function hostOnData(conn, d) {
     if (room.phase !== 'lobby' && game) conn.send(snapshot(game));
   } else if (d.t === 'in') {
     const m = room.members.find(m => m.peerId === conn.peer); if (!m) return;
+    const q = typeof d.q === 'number' ? d.q : 0;
+    if (q && q <= (m.inSeq || 0)) return;   // eldre pakke kom fram etter en nyere (uordnet kanal)
+    if (q) m.inSeq = q;
     const dir = DIRS[d.d] ? d.d : null;
     m.input.dir = dir;
     const p = game && game.players.find(p => p.slot === m.slot);
-    if (p) { p.input.dir = dir; if (typeof d.b === 'number' && d.b > m.lastBs) p.input.bomb = true; }
+    if (p) { p.input.dir = dir; p.ack = m.inSeq || 0; p.ackN = 0; if (typeof d.b === 'number' && d.b > m.lastBs) p.input.bomb = true; }
     if (typeof d.b === 'number') m.lastBs = Math.max(m.lastBs, d.b);
   }
 }
 function hostDrop(conn) {
   if (!net.conns.has(conn.peer)) return;
-  net.conns.delete(conn.peer);
+  net.conns.delete(conn.peer); net.fast.delete(conn.peer);
   const m = room.members.find(m => m.peerId === conn.peer);
   if (m) {
     room.members = room.members.filter(x => x !== m);
@@ -830,17 +963,27 @@ function startRound() {
   lastSnap = snapshot(game);
   broadcast(lobbyMsg()); broadcast(lastSnap);
 }
-let scored = false, localBs = 0, sendAcc = 0;
+let scored = false, localBs = 0, sendAcc = 0, simAcc = 0, snapSeq = 0;
+function sendSnap(snap) {
+  for (const [id, c] of net.conns) {
+    const f = net.fast.get(id), ch = f && f.open ? f : c;
+    if (ch.open) { try { ch.send(snap); } catch (e) { } }
+  }
+}
 function hostTick(dt) {
   if (!game) return;
   const me = game.players.find(p => p.slot === 0);
   if (me) { me.input.dir = curDir(); if (bombSeq > localBs) { localBs = bombSeq; me.input.bomb = true; } }
-  let left = Math.min(dt, 0.25);
-  while (left > 0) { const h = Math.min(left, 1 / 60); game.step(h); left -= h; }
+  simAcc = Math.min(simAcc + dt, 0.5);
+  let stepped = false;
+  while (simAcc >= STEP) {
+    game.step(STEP); simAcc -= STEP; stepped = true;
+    for (const p of game.players) if (p.ack) p.ackN = (p.ackN || 0) + 1;
+  }
   if (game.phase === 'over' && !scored) { scored = true; if (game.winner >= 0) room.scores[game.winner]++; hostScoreRound(game); room.phase = 'over'; }
-  lastSnap = snapshot(game);
+  if (stepped || !lastSnap) lastSnap = snapshot(game);
   sendAcc += dt;
-  if (sendAcc >= 0.05) { sendAcc = 0; if (net.conns.size) broadcast(lastSnap); }
+  if (sendAcc >= SEND_DT) { sendAcc = Math.min(sendAcc - SEND_DT, SEND_DT); if (net.conns.size) sendSnap(lastSnap); }
 }
 
 // --- Klient ---
@@ -861,6 +1004,12 @@ function joinRoom(code) {
     conn.on('data', clientOnData);
     conn.on('close', () => { if (net.role === 'client') leave('Forbindelsen til verten ble brutt.'); });
     conn.on('error', () => { });
+    conn.on('open', () => {   // egen upålitelig kanal for input og tilstand
+      const fc = peer.connect(PEER_PREFIX + code, { reliable: false, serialization: 'json', label: 'bbfast' });
+      net.hostFast = fc;
+      fc.on('data', clientOnData); fc.on('error', () => { });
+      fc.on('close', () => { if (net.hostFast === fc) net.hostFast = null; });
+    });
   });
   peer.on('error', e => {
     if (e.type === 'peer-unavailable') leave('Fant ikke rom ' + code + '. Er koden riktig, og er verten fortsatt i rommet?');
@@ -876,18 +1025,27 @@ function clientOnData(d) {
     if (d.phase === 'lobby') { show('lobby'); }
     renderLobby();
   } else if (d.t === 's') {
+    if (d.sq && d.sq <= lastSq) return;   // utdatert (kom fram etter en nyere)
+    lastSq = d.sq || lastSq;
     if (d.mp && d.mp !== mapId) setMap(d.mp);
-    lastSnap = d; room.scores = d.sc || room.scores; room.lb = d.lb || room.lb;
+    lastSnap = d; onClientSnap(d); room.scores = d.sc || room.scores; room.lb = d.lb || room.lb;
     if (!inGame() && room.members.some(m => m.slot === mySlot)) { for (const k in disp) delete disp[k]; show('game'); fitView(); }
   }
 }
-function clientTick() {
+let cAcc = 0, inSeq = 0, sentDir = null, sentB = -1, sentT = 0;
+function clientTick(dt) {
   if (!net.hostConn || !net.hostConn.open) return;
-  const msg = { t: 'in', d: curDir(), b: bombSeq };
-  const key = msg.d + '|' + msg.b, now = performance.now();
-  if (key !== lastSent || now - lastSentT > 250) {
-    lastSent = key; lastSentT = now;
-    try { net.hostConn.send(msg); } catch (e) { }
+  const dir = inGame() ? curDir() : null;
+  cAcc = Math.min(cAcc + dt, 0.25);
+  while (cAcc >= STEP) { cAcc -= STEP; inSeq++; predictStep(inSeq, dir); }
+  sentT += dt;
+  const bomb = bombSeq !== sentB;
+  if (dir !== sentDir || bomb || sentT >= (inGame() ? SEND_DT : 0.25)) {
+    sentT = 0; sentDir = dir; sentB = bombSeq;
+    const msg = { t: 'in', d: dir, b: bombSeq, q: inSeq };
+    const fast = net.hostFast && net.hostFast.open ? net.hostFast : null;
+    try { (fast || net.hostConn).send(msg); } catch (e) { }
+    if (fast && bomb) { try { net.hostConn.send(msg); } catch (e) { } }   // bombetrykk går også pålitelig
   }
 }
 
@@ -925,8 +1083,9 @@ function renderLobby() {
   $('btnStart').disabled = room.members.length < 2;
   $('btnStart').textContent = room.members.length < 2 ? 'Start (trenger minst 2)' : 'Start';
 }
-let hudKey = '', overKey = '';
+let hudKey = '', overKey = '', hudSnap = null;
 function updateHud(s) {
+  if (s === hudSnap) return; hudSnap = s;
   const key = JSON.stringify(s.p.map(p => [p[0], p[3], p[7], p[8], p[9], p[10], p[12]]));
   if (key !== hudKey) {
     hudKey = key; const hud = $('hud'); hud.innerHTML = ''; hud.classList.toggle('many', s.p.length > 4);
@@ -992,16 +1151,27 @@ if (inviteCode) { $('invitePanel').style.display = ''; $('inviteCode').textConte
 buildTiles();
 setMap('small');
 let lastT = performance.now(), simLast = performance.now();
-setInterval(() => {   // simulering/nett går også når fanen ikke tegner
-  const now = performance.now(), dt = (now - simLast) / 1000; simLast = now;
+function simTick() {   // simulering/nett går også når fanen ikke tegner
+  const now = performance.now(), dt = Math.min(1, (now - simLast) / 1000); simLast = now;
   if (net.role === 'host') hostTick(dt);
-  else if (net.role === 'client') clientTick();
-}, 1000 / 60);
+  else if (net.role === 'client') clientTick(dt);
+}
+// Takten kommer fra en Web Worker: vanlige tidtakere strupes til én gang i sekundet i skjulte faner,
+// og da ville spillet nesten stoppe for alle når verten bytter fane.
+(() => {
+  let w = null;
+  try { w = new Worker(URL.createObjectURL(new Blob(['setInterval(function () { postMessage(0); }, ' + (1000 / 60) + ');'], { type: 'text/javascript' }))); w.onmessage = simTick; }
+  catch (e) { w = null; }
+  if (!w) setInterval(simTick, 1000 / 60);
+})();
 function frame() {
   const now = performance.now(), dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
   if (inGame() && lastSnap) {
+    const t0 = performance.now();
+    updatePositions(lastSnap, now / 1000, dt);
     render(lastSnap, now / 1000, dt);
     present(dt);
+    if (window.__bbm) (window.__rt = window.__rt || []).push(performance.now() - t0);
     updateHud(lastSnap);
     lastEx = lastSnap.ex;
   }

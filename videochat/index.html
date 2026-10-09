@@ -138,7 +138,7 @@
   }
 </style>
 </head>
-<body>
+<body data-screen="menu">
 
 <!-- MENY -->
 <section id="menu" class="screen on">
@@ -173,14 +173,15 @@
     <h2>Spill alene</h2>
     <button class="big grey" id="btnSolo">Spill mot boter</button>
   </div>
+  <footer>Styring: piltaster eller WASD, mellomrom = bombe, M = lyd av/på. På mobil brukes knappene under brettet.<br>Power-ups: 💣 flere bomber · 🔥 lengre flamme · ⚡ fart · 🥊 Boksehanske: dytt bomber</footer>
+</section>
+<!-- Beste spillere: venstre sidekolonne på store skjermer, under menyen på mobil -->
   <div class="bbx-board" id="lbPanel">
     <h2>🏆 BESTE SPILLERE</h2>
     <div id="lbTabs" style="display:none"><button type="button" data-t="local" class="on">Denne enheten</button><button type="button" data-t="global">Alle spillere</button></div>
     <div id="lbList"></div>
     <div class="hint">Seire, runder og drap per navn. Boter telles ikke.</div>
   </div>
-  <footer>Styring: piltaster eller WASD, mellomrom = bombe, M = lyd av/på. På mobil brukes knappene under brettet.<br>Power-ups: 💣 flere bomber · 🔥 lengre flamme · ⚡ fart · 🥊 Boksehanske: dytt bomber</footer>
-</section>
 
 <!-- LOBBY -->
 <section id="lobby" class="screen">
