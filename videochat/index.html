@@ -2,7 +2,7 @@
 <html lang="no">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Super BomberBoyz med videochat</title>
 <meta name="description" content="Super BomberBoyz: retro bombespill i nettleseren for opptil fire spillere online. Ingen installasjon.">
 <meta name="application-name" content="Super BomberBoyz">
@@ -93,6 +93,7 @@
   #btnFull { display:none !important; }
   /* ---------- Touch (alltid liggende): kompakt spillerkolonne med styrekorset nederst, bombeknapp til høyre ---------- */
   :root { --dp: clamp(40px, min(6vw, 13vh), 62px); --bomb: clamp(76px, min(10vw, 24vh), 110px); }
+  body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }   /* hakk/hjemlinje */
   body.touch #game.screen { padding: 6px calc(var(--bomb) + 26px) 6px 8px; }
   body.touch.lcol #hudrow { flex:0 0 calc(var(--dp) * 3 + 8px); width:calc(var(--dp) * 3 + 8px); gap:6px; }
   body.touch.lcol #timer { font-size:20px; }
@@ -106,13 +107,17 @@
   body.touch.lcol #gamebar .gbtns button { font-size:12px; padding:4px 8px; }
   body.touch #hudrow .dpad { grid-template-columns: repeat(3, var(--dp)); grid-template-rows: repeat(3, var(--dp)); gap:4px; margin-top:4px; flex:0 0 auto; }
   body.touch #hudrow .dpad button { font-size: calc(var(--dp) * .4); }
-  body.touch #touch { display:block; position:fixed; right:14px; bottom:max(18px, env(safe-area-inset-bottom)); margin:0; padding:0; z-index:5; }
+  /* bombeknappen: samme midthøyde som styrekorset (som står nederst i kolonnen), like langt fra høyre kant som korset fra venstre */
+  body.touch #touch { display:block; position:fixed; right:calc(8px + env(safe-area-inset-right)); margin:0; padding:0; z-index:5;
+    bottom:calc(env(safe-area-inset-bottom) + 6px + (var(--dp) * 3 + 8px) / 2 - var(--bomb) / 2); }
   body.touch #tbomb { width:var(--bomb); height:var(--bomb); font-size:calc(var(--bomb) * .2); }
   body:not(.touch) #touch { display:none !important; }
   body.touch #avGame { flex:0 0 clamp(110px, 16vw, 196px); max-height:calc(100vh - 12px); overflow:auto; }
   body.touch #avGame #avctl button span, body.touch #avGame #avStatus, body.touch #avGame .vt-lvl, body.touch #avGame .vt-st { display:none; }
   body.touch #avGame #avctl button { font-size:16px; padding:5px 6px; }
   body.touch #avGame .vt-nm { font-size:10px; padding:1px 4px; }
+  body.touch.lcol #playarea { justify-content:flex-start; }   /* kolonnen helt til venstre (samme marg som bombeknappen til høyre) */
+  body.touch.lcol #playarea > #wrap, body.touch.lcol #stage { align-self:center; margin-left:auto; margin-right:auto; }
   #rotate { display:none; }
   @media (orientation: portrait) {
     body.touch #rotate { display:flex; position:fixed; inset:0; z-index:9999; background:var(--bg); color:#ffd23a; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; font-size:26px; font-weight:bold; padding:20px; }

@@ -514,8 +514,9 @@ const view = { x: 0, y: 0, w: cv.width, h: cv.height };   // hele brettet vises
 const FIT = { tile: 0, key: '' };
 function fitView() {
   const touch = document.body.classList.contains('touch'), g = $('game'), av = $('avGame'), stage = $('stage');
-  const gs = getComputedStyle(g), W = document.documentElement.clientWidth || window.innerWidth, H = window.innerHeight;
+  const gs = getComputedStyle(g), bs = getComputedStyle(document.body), W = (document.documentElement.clientWidth || window.innerWidth) - parseFloat(bs.paddingLeft) - parseFloat(bs.paddingRight), H = window.innerHeight - parseFloat(bs.paddingTop) - parseFloat(bs.paddingBottom);
   const padX = parseFloat(gs.paddingLeft) + parseFloat(gs.paddingRight), padY = parseFloat(gs.paddingTop) + parseFloat(gs.paddingBottom);
+  $('playarea').style.height = document.body.classList.contains('touch') ? Math.floor(H - padY) + 'px' : '';   // touch: kolonnen (med styrekorset nederst) går til bunnen av skjermen
   placeLayout();
   const top = 0, bar = 0, SH = 8;
   const stacked = getComputedStyle(stage).flexDirection.startsWith('column');

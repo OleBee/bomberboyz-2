@@ -541,8 +541,9 @@ const FIT = { tile: 0, cam: false, key: '' };
 function fitView() {
   if (!FW) return;
   placeLayout();
-  const g = $('game'), gs = getComputedStyle(g), W = document.documentElement.clientWidth || window.innerWidth, H = window.innerHeight;
+  const g = $('game'), gs = getComputedStyle(g), bs = getComputedStyle(document.body), W = (document.documentElement.clientWidth || window.innerWidth) - parseFloat(bs.paddingLeft) - parseFloat(bs.paddingRight), H = window.innerHeight - parseFloat(bs.paddingTop) - parseFloat(bs.paddingBottom);
   const padX = parseFloat(gs.paddingLeft) + parseFloat(gs.paddingRight), padY = parseFloat(gs.paddingTop) + parseFloat(gs.paddingBottom);
+  $('playarea').style.height = document.body.classList.contains('touch') ? Math.floor(H - padY) + 'px' : '';   // touch: kolonnen (med styrekorset nederst) går til bunnen av skjermen
   const SH = 8, colW = colWidth() + 12;   // skygge, spillerkolonne + mellomrom
   const availW = Math.max(120, W - padX - SH - colW), availH = Math.max(100, H - padY - SH);
   const tile = Math.min(availW / FW, availH / FH);
