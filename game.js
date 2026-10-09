@@ -535,72 +535,53 @@ function onMapChange() {
   document.body.classList.toggle('bigmap', mapId === 'big');   // stort brett får bredere spilleflate
   view.init = false; fitView();
 }
-// Hele brettet vises alltid på PC/laptop: brettet skaleres til vinduet (størst mulige ruter som får plass i bredde og høyde).
-// Touch: hele brettet hvis rutene blir minst 24 px (nettbrett, ev. med knappene på sidene); ellers et utsnitt som følger deg (mobil).
-const FIT = { tile: 0, cam: false, side: false, key: '' };
-const TOUCH_SIDE = 215;   // plass til styrekors/bombeknapp på hver side når de ligger ved siden av brettet
+// Hele brettet vises alltid (PC, nettbrett og mobil – alltid liggende): brettet skaleres til plassen ved siden av spillerkolonnen
+// (størst mulige ruter som får plass i bredde og høyde). Ingen følgekamera.
+const FIT = { tile: 0, cam: false, key: '' };
 function fitView() {
   if (!FW) return;
-  const touch = document.body.classList.contains('touch'), g = $('game');
-  const gs = getComputedStyle(g), W = document.documentElement.clientWidth || window.innerWidth, H = window.innerHeight;
+  placeLayout();
+  const g = $('game'), gs = getComputedStyle(g), W = document.documentElement.clientWidth || window.innerWidth, H = window.innerHeight;
   const padX = parseFloat(gs.paddingLeft) + parseFloat(gs.paddingRight), padY = parseFloat(gs.paddingTop) + parseFloat(gs.paddingBottom);
-  placeLayout(); const lcol = document.body.classList.contains('lcol');
-  const top = lcol ? 0 : $('hudrow').offsetHeight + 6, bar = lcol ? 0 : $('gamebar').offsetHeight + 8, SH = 8;   // HUD-rad, linja under, skygge (ikke når de står i venstrekolonnen)
-  const ww = FW * TS, wh = FH * TS;
-  const availW = Math.max(160, W - padX - SH - (lcol ? LCOL_W : 0)), availH = Math.max(120, H - padY - top - bar - SH);
-  const tb = $('touch'), touchH = touch ? (tb.offsetHeight && !document.body.classList.contains('tside') ? tb.offsetHeight + 10 : 214) : 0;   // knappene under brettet
-  let tile = Math.min(availW / FW, (availH - touchH) / FH), side = false;
-  if (touch) { const ts = Math.min((availW - 2 * TOUCH_SIDE) / FW, availH / FH); if (ts > tile) { tile = ts; side = true; } }
-  const cam = touch && tile < 24;
-  let w = ww, h = wh, cssW, cssH;
-  if (!cam) {   // hele brettet; heltallig pikselskalering når det koster under 10 % størrelse
-    const dpr = window.devicePixelRatio || 1, t = Math.max(4, Math.floor(tile)), ti = Math.floor(tile * dpr / TS) * TS / dpr;
-    const tt = ti >= TS / dpr && ti >= t * 0.9 ? ti : t;
-    cssW = FW * tt; cssH = FH * tt; FIT.tile = tt;
-  } else {   // mobil: utsnitt med vanlig rutestørrelse som følger deg
-    side = false;
-    const aH = Math.max(160, availH - touchH);
-    if (mapId === 'big') {
-      const tilePx = Math.max(26, Math.min(availW / (15 * TS), aH / (13 * TS)) * TS);
-      w = Math.min(ww, Math.max(11, Math.min(21, Math.floor(availW / tilePx))) * TS);
-      h = Math.min(wh, Math.max(9, Math.floor(aH / tilePx)) * TS);
-    } else {
-      w = Math.min(ww, Math.max(15, Math.floor(availW / 34)) * TS);
-      h = Math.min(wh, Math.max(11, Math.floor(aH / 34)) * TS);
-    }
-    const sc = Math.min(availW / w, aH / h);
-    cssW = Math.floor(w * sc); cssH = Math.floor(h * sc); FIT.tile = +(sc * TS).toFixed(1);
-  }
-  FIT.cam = cam; FIT.side = side;
-  document.body.classList.toggle('tside', touch && side);
+  const SH = 8, colW = colWidth() + 12;   // skygge, spillerkolonne + mellomrom
+  const availW = Math.max(120, W - padX - SH - colW), availH = Math.max(100, H - padY - SH);
+  const tile = Math.min(availW / FW, availH / FH);
+  // heltallig pikselskalering når det koster under 10 % størrelse
+  const dpr = window.devicePixelRatio || 1, t = Math.max(3, Math.floor(tile)), ti = Math.floor(tile * dpr / TS) * TS / dpr;
+  const tt = ti >= TS / dpr && ti >= t * 0.9 ? ti : t;
+  const w = FW * TS, h = FH * TS, cssW = FW * tt, cssH = FH * tt; FIT.tile = tt;
   if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
   vctx.imageSmoothingEnabled = false;
-  view.w = w; view.h = h; if (!cam) { view.x = 0; view.y = 0; }
+  view.w = w; view.h = h; view.x = 0; view.y = 0;
   const key = cssW + 'x' + cssH;
-  if (key !== FIT.key) { FIT.key = key; cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px'; g.style.setProperty('--bw', cssW + 'px'); }
+  if (key !== FIT.key) { FIT.key = key; cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px'; $('wrap').style.width = (cssW + 8) + 'px'; g.style.setProperty('--bw', cssW + 'px'); }
 }
 window.addEventListener('resize', fitView);
-if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if (inGame()) fitView(); }); ro.observe($('hudrow')); ro.observe($('gamebar')); }
+if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if (inGame()) fitView(); }); ro.observe($('hudrow')); }
 // Fullskjerm: knapp i linja under brettet og F-tasten
-// PC (ikke touch): spillerlista i egen kolonne til venstre for brettet, klokka øverst, lyd + Avslutt nederst. Touch: over brettet som før.
-const LCOL_W = 212;   // kolonnebredde + mellomrom
+// Samme oppsett overalt (alltid liggende): spillerkolonne til venstre for brettet med klokka øverst, lyd + Avslutt nederst.
+// Touch: kompakt kolonne (farge + seire) med styrekorset nederst i kolonnen og bombeknappen til høyre på skjermen.
+// PC (fin peker): ingen touchknapper.
+function colWidth() { const w = $('hudrow').offsetWidth; return w || (document.body.classList.contains('touch') ? 158 : 200); }
 function placeLayout() {
-  const col = !document.body.classList.contains('touch');
-  if (placeLayout.mode === col) return; placeLayout.mode = col;
-  document.body.classList.toggle('lcol', col);
-  const hr = $('hudrow'), gb = $('gamebar'), ss = $('sndSlot'), gbt = gb.querySelector('.gbtns');
-  if (col) { hr.appendChild(gb); gbt.insertBefore(ss, gbt.firstChild); }
-  else { $('game').appendChild(gb); hr.appendChild(ss); }
+  const touch = document.body.classList.contains('touch');
+  if (placeLayout.mode === touch) return; placeLayout.mode = touch;
+  document.body.classList.add('lcol');
+  const hr = $('hudrow'), gb = $('gamebar'), ss = $('sndSlot'), gbt = gb.querySelector('.gbtns'), dp = document.querySelector('.dpad');
+  if (gb.parentNode !== hr) { hr.appendChild(gb); gbt.insertBefore(ss, gbt.firstChild); }
+  if (touch) hr.appendChild(dp); else $('touch').insertBefore(dp, $('touch').firstChild);
 }
-// Fullskjerm som standard på PC: bes om inne i klikket/tastetrykket som starter et spill (nettlesere krever en brukerhandling).
+// Fullskjerm som standard (PC, nettbrett, Android): bes om inne i klikket/tastetrykket som starter et spill (nettlesere krever en brukerhandling).
 // Esc respekteres resten av spillet; neste spillstart ber om fullskjerm igjen. Klienter: ved første klikk/tast i lobby/spill.
 let fsArm = false;
 function autoFull() {
   fsArm = false;
   const d = document, el = d.documentElement;
-  if (d.body.classList.contains('touch') || d.fullscreenElement || d.webkitFullscreenElement || !(d.fullscreenEnabled || d.webkitFullscreenEnabled)) return;
+  const lock = () => { try { const o = screen.orientation; if (o && o.lock) o.lock('landscape').catch(() => {}); } catch (e) { } };   // Android; iOS kan ikke låse (da vises «Snu enheten»)
+  if (d.fullscreenElement || d.webkitFullscreenElement) { lock(); return; }
+  if (!(d.fullscreenEnabled || d.webkitFullscreenEnabled)) return;
   const r = el.requestFullscreen || el.webkitRequestFullscreen;
-  try { const p = r.call(el, { navigationUI: 'hide' }); if (p && p.catch) p.catch(() => {}); } catch (e) { }
+  try { const p = r.call(el, { navigationUI: 'hide' }); if (p && p.then) p.then(lock, () => {}); else lock(); } catch (e) { }
 }
 function fsGesture(e) {
   if (!fsArm || !/^(lobby|game)$/.test(document.body.dataset.screen || '')) return;
@@ -939,7 +920,8 @@ const touchBox = $('touch');
 ['touchstart', 'touchmove', 'touchend', 'gesturestart', 'dblclick', 'contextmenu'].forEach(ev => touchBox.addEventListener(ev, e => { if (e.cancelable) e.preventDefault(); }, { passive: false }));
 document.addEventListener('visibilitychange', () => { if (document.hidden) { padPid = null; setPadDir(null); } });
 if (window.matchMedia && matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
-window.addEventListener('touchstart', () => { document.body.classList.add('touch'); fitView(); }, { once: true, passive: true });
+placeLayout();
+window.addEventListener('touchstart', () => { document.body.classList.add('touch'); placeLayout(); fitView(); }, { once: true, passive: true });
 
 // ---------- Rom og nettverk ----------
 const net = { role: 'none', peer: null, conns: new Map(), hostConn: null, fast: new Map(), hostFast: null };
@@ -1230,7 +1212,7 @@ function renderLobby() {
   $('waitTxt').style.display = host ? 'none' : '';
   $('btnAddBot').disabled = room.members.length >= MAXP;
   $('btnMap').textContent = 'Brett: ' + (room.map === 'big' ? 'Stort' : 'Vanlig');
-  $('mapInfo').textContent = 'Brett: ' + MAP_NAME[room.map === 'big' ? 'big' : 'small'] + (room.map === 'big' && document.body.classList.contains('touch') ? ', kameraet følger deg på mobil' : '') + ' · opptil 8 spillere';
+  $('mapInfo').textContent = 'Brett: ' + MAP_NAME[room.map === 'big' ? 'big' : 'small'] + '' + ' · opptil 8 spillere';
   $('btnDelBot').disabled = !room.members.some(m => m.bot);
   $('btnStart').disabled = room.members.length < 2;
   $('btnStart').textContent = room.members.length < 2 ? 'Start (trenger minst 2)' : 'Start';
@@ -1242,7 +1224,7 @@ function updateHud(s) {
   if (key !== hudKey) {
     hudKey = key; const hud = $('hud'); hud.innerHTML = ''; hud.classList.toggle('many', s.p.length > 4);
     for (const p of s.p) {
-      const d = document.createElement('div'); d.className = 'hp' + (p[3] ? '' : ' dead');
+      const d = document.createElement('div'); d.className = 'hp' + (p[3] ? '' : ' dead') + (p[0] === mySlot ? ' me' : ''); d.title = p[10];
       d.innerHTML = `<i style="background:${COLORS[p[0]].c}"></i><b></b><span>💣${p[7]} 🔥${p[8]} ⚡${p[9]}${p[12] ? ' 🥊' : ''}</span><em title="Seire">🏆${s.sc ? s.sc[p[0]] | 0 : 0}</em>`;
       d.querySelector('b').textContent = p[10] + (p[0] === mySlot ? ' (deg)' : '');
       hud.appendChild(d);

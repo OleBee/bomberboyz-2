@@ -1,0 +1,10 @@
+{
+  "name": "Super BomberBoyz",
+  "short_name": "BomberBoyz",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0e1016",
+  "theme_color": "#0e1016"
+}

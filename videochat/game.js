@@ -516,40 +516,44 @@ function fitView() {
   const touch = document.body.classList.contains('touch'), g = $('game'), av = $('avGame'), stage = $('stage');
   const gs = getComputedStyle(g), W = document.documentElement.clientWidth || window.innerWidth, H = window.innerHeight;
   const padX = parseFloat(gs.paddingLeft) + parseFloat(gs.paddingRight), padY = parseFloat(gs.paddingTop) + parseFloat(gs.paddingBottom);
-  placeLayout(); const lcol = document.body.classList.contains('lcol');
-  const top = lcol ? 0 : $('hudrow').offsetHeight + 6, bar = lcol ? 0 : $('gamebar').offsetHeight + 8, SH = 8;
+  placeLayout();
+  const top = 0, bar = 0, SH = 8;
   const stacked = getComputedStyle(stage).flexDirection.startsWith('column');
   const avW = !stacked && av.offsetWidth ? av.offsetWidth + 12 : 0, avH = stacked && av.offsetHeight ? av.offsetHeight + 6 : 0;
   const FWc = cv.width / TS, FHc = cv.height / TS;
-  const availW = Math.max(160, W - padX - SH - avW - (lcol ? LCOL_W : 0)), availH = Math.max(120, H - padY - top - bar - SH - avH - (touch ? ($('touch').offsetHeight ? $('touch').offsetHeight + 10 : 214) : 0));
+  const availW = Math.max(120, W - padX - SH - avW - colWidth() - 12), availH = Math.max(100, H - padY - top - bar - SH - avH);
   const tile = Math.min(availW / FWc, availH / FHc);
   const dpr = window.devicePixelRatio || 1, t = Math.max(4, Math.floor(tile)), ti = Math.floor(tile * dpr / TS) * TS / dpr;
   const tt = ti >= TS / dpr && ti >= t * 0.9 ? ti : t;
   FIT.tile = tt;
   const cssW = FWc * tt, cssH = FHc * tt, key = cssW + 'x' + cssH + ':' + avW;
-  if (key !== FIT.key) { FIT.key = key; cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px'; g.style.setProperty('--bw', (cssW + avW) + 'px'); }
+  if (key !== FIT.key) { FIT.key = key; cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px'; $('wrap').style.width = (cssW + 8) + 'px'; $('stage').style.width = stacked ? '' : (cssW + 8 + avW) + 'px'; g.style.setProperty('--bw', (cssW + avW) + 'px'); }
 }
 window.addEventListener('resize', fitView);
-if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if ($('game').classList.contains('on')) fitView(); }); ro.observe($('hudrow')); ro.observe($('gamebar')); ro.observe($('avGame')); }
-// PC (ikke touch): spillerlista i egen kolonne til venstre for brettet, klokka øverst, lyd + Avslutt nederst. Touch: over brettet som før.
-const LCOL_W = 212;   // kolonnebredde + mellomrom
+if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if ($('game').classList.contains('on')) fitView(); }); ro.observe($('hudrow')); ro.observe($('avGame')); }
+// Samme oppsett overalt (alltid liggende): spillerkolonne til venstre for brettet med klokka øverst, lyd + Avslutt nederst.
+// Touch: kompakt kolonne (farge + seire) med styrekorset nederst i kolonnen og bombeknappen til høyre på skjermen.
+// PC (fin peker): ingen touchknapper.
+function colWidth() { const w = $('hudrow').offsetWidth; return w || (document.body.classList.contains('touch') ? 158 : 200); }
 function placeLayout() {
-  const col = !document.body.classList.contains('touch');
-  if (placeLayout.mode === col) return; placeLayout.mode = col;
-  document.body.classList.toggle('lcol', col);
-  const hr = $('hudrow'), gb = $('gamebar'), ss = $('sndSlot'), gbt = gb.querySelector('.gbtns');
-  if (col) { hr.appendChild(gb); gbt.insertBefore(ss, gbt.firstChild); }
-  else { $('game').appendChild(gb); hr.appendChild(ss); }
+  const touch = document.body.classList.contains('touch');
+  if (placeLayout.mode === touch) return; placeLayout.mode = touch;
+  document.body.classList.add('lcol');
+  const hr = $('hudrow'), gb = $('gamebar'), ss = $('sndSlot'), gbt = gb.querySelector('.gbtns'), dp = document.querySelector('.dpad');
+  if (gb.parentNode !== hr) { hr.appendChild(gb); gbt.insertBefore(ss, gbt.firstChild); }
+  if (touch) hr.appendChild(dp); else $('touch').insertBefore(dp, $('touch').firstChild);
 }
-// Fullskjerm som standard på PC: bes om inne i klikket/tastetrykket som starter et spill (nettlesere krever en brukerhandling).
+// Fullskjerm som standard (PC, nettbrett, Android): bes om inne i klikket/tastetrykket som starter et spill (nettlesere krever en brukerhandling).
 // Esc respekteres resten av spillet; neste spillstart ber om fullskjerm igjen. Klienter: ved første klikk/tast i lobby/spill.
 let fsArm = false;
 function autoFull() {
   fsArm = false;
   const d = document, el = d.documentElement;
-  if (d.body.classList.contains('touch') || d.fullscreenElement || d.webkitFullscreenElement || !(d.fullscreenEnabled || d.webkitFullscreenEnabled)) return;
+  const lock = () => { try { const o = screen.orientation; if (o && o.lock) o.lock('landscape').catch(() => {}); } catch (e) { } };   // Android; iOS kan ikke låse (da vises «Snu enheten»)
+  if (d.fullscreenElement || d.webkitFullscreenElement) { lock(); return; }
+  if (!(d.fullscreenEnabled || d.webkitFullscreenEnabled)) return;
   const r = el.requestFullscreen || el.webkitRequestFullscreen;
-  try { const p = r.call(el, { navigationUI: 'hide' }); if (p && p.catch) p.catch(() => {}); } catch (e) { }
+  try { const p = r.call(el, { navigationUI: 'hide' }); if (p && p.then) p.then(lock, () => {}); else lock(); } catch (e) { }
 }
 function fsGesture(e) {
   if (!fsArm || !/^(lobby|game)$/.test(document.body.dataset.screen || '')) return;
@@ -879,7 +883,8 @@ const touchBox = $('touch');
 ['touchstart', 'touchmove', 'touchend', 'gesturestart', 'dblclick', 'contextmenu'].forEach(ev => touchBox.addEventListener(ev, e => { if (e.cancelable) e.preventDefault(); }, { passive: false }));
 document.addEventListener('visibilitychange', () => { if (document.hidden) { padPid = null; setPadDir(null); } });
 if (window.matchMedia && matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
-window.addEventListener('touchstart', () => { document.body.classList.add('touch'); fitView(); }, { once: true, passive: true });
+placeLayout();
+window.addEventListener('touchstart', () => { document.body.classList.add('touch'); placeLayout(); fitView(); }, { once: true, passive: true });
 
 // ---------- Rom og nettverk ----------
 const net = { role: 'none', peer: null, conns: new Map(), hostConn: null, fast: new Map(), hostFast: null };
@@ -1197,7 +1202,7 @@ function updateHud(s) {
   if (key !== hudKey) {
     hudKey = key; const hud = $('hud'); hud.innerHTML = '';
     for (const p of s.p) {
-      const d = document.createElement('div'); d.className = 'hp' + (p[3] ? '' : ' dead');
+      const d = document.createElement('div'); d.className = 'hp' + (p[3] ? '' : ' dead') + (p[0] === mySlot ? ' me' : ''); d.title = p[10];
       d.innerHTML = `<i style="background:${COLORS[p[0]].c}"></i><b></b><span>💣${p[7]} 🔥${p[8]} ⚡${p[9]}${p[12] ? ' 🥊' : ''}</span><em title="Seire">🏆${s.sc ? s.sc[p[0]] | 0 : 0}</em>`;
       d.querySelector('b').textContent = p[10] + (p[0] === mySlot ? ' (deg)' : '');
       hud.appendChild(d);

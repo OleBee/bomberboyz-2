@@ -1,0 +1,10 @@
+{
+  "name": "Super BomberBoyz – videochat",
+  "short_name": "BomberBoyz",
+  "start_url": "/videochat/",
+  "scope": "/videochat/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0e1016",
+  "theme_color": "#0e1016"
+}
