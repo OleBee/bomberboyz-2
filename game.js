@@ -1277,15 +1277,15 @@ function frame() {
   requestAnimationFrame(frame);
 }
 let audSnap = null, recorded = '', timerTxt = '';
-function updateTimer() {   // nedtelling i HUD-raden (3:00 → 0:00), rød og blinkende de siste 30 sekundene
+function updateTimer() {   // nedtelling i HUD-raden: skjult til 0:30 gjenstår, da rød og blinkende
   const el = $('timer'); if (!el) return;
   const s = lastSnap; let txt = '';
-  if (inGame() && s && s.p) {
+  if (inGame() && s && s.p && s.tm >= SD_START) {   // vises først når 30 s gjenstår (sammen med HURRY UP!)
     const left = Math.max(0, Math.ceil(ROUND_LIMIT - Math.max(s.tm, READY_TIME)));
     txt = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
-    el.classList.toggle('hurry', s.ph === 'play' && s.tm >= SD_START);
+    el.classList.toggle('hurry', s.ph === 'play');
   }
-  if (txt !== timerTxt) { timerTxt = txt; el.textContent = txt; el.style.visibility = txt ? 'visible' : 'hidden'; }
+  if (txt !== timerTxt) { timerTxt = txt; el.textContent = txt; el.style.display = txt ? 'block' : 'none'; $('hudrow').classList.toggle('tmr', !!txt); }
 }
 function audioEvents(a, s) {
   if (!s || !s.p) return;
