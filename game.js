@@ -526,7 +526,7 @@ function fitView() {
   const touch = document.body.classList.contains('touch');
   const availW = Math.max(200, ($('wrap').clientWidth || window.innerWidth) - 4);
   const hudH = $('hud').offsetHeight || 30;
-  const availH = Math.max(160, window.innerHeight - hudH - (touch ? 230 : 90));
+  const availH = Math.max(160, window.innerHeight - hudH - (touch ? 268 : 90));
   const ww = FW * TS, wh = FH * TS;
   let w = ww, h = wh;
   if (mapId === 'big') {   // samme rutestørrelse som på vanlig brett – brettet skal se større ut, ikke bare krympes

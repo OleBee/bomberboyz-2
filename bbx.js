@@ -15,7 +15,7 @@ window.BBX = (() => {
   const LEVELS = [0.25, 0.5, 0.85];
   const snd = Object.assign({ vol: 0.5, muted: false }, store.get('bk-sound', {}));
   let ctx = null, master = null, musicBus = null, sfxBus = null, pulse = null, noiseBuf = null;
-  let want = null, cur = null, seqTimer = null;
+  let want = null, cur = null, seqTimer = null, ana = null;
   const dbg = { started: false, music: null, sfx: {}, jingles: [] };
 
   function noteHz(n) {
@@ -28,18 +28,36 @@ window.BBX = (() => {
     for (let n = 1; n <= N; n++) { re[n] = Math.sin(2 * Math.PI * n * duty) / (n * Math.PI); im[n] = (1 - Math.cos(2 * Math.PI * n * duty)) / (n * Math.PI); }
     return ctx.createPeriodicWave(re, im);
   }
+  const target = () => snd.muted ? 0 : snd.vol * 0.6;
+  let volT = 0;
   function applyVol() {
+    // Ikke bruk setTargetAtTime mens konteksten står stille: i noen nettlesere (særlig Safari) ble hovedvolumet
+    // da hengende på 0 til lyden ble slått av og på igjen. Sett verdien direkte, og glid bare når lyden går.
     if (!master) return;
-    master.gain.setTargetAtTime(snd.muted ? 0 : snd.vol * 0.6, ctx.currentTime, 0.03);
+    const g = master.gain, v = target();
+    try { g.cancelScheduledValues(0); } catch (e) { }
+    if (ctx.state !== 'running') { g.value = v; return; }
+    const t = ctx.currentTime; volT = t + 0.06;
+    g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(v, volT);
   }
+  function onRunning() {   // hver gang lyden faktisk går: riktig volum og ønsket musikk
+    if (!ctx || ctx.state !== 'running') return;
+    if (Math.abs(master.gain.value - target()) > 0.005 && ctx.currentTime > volT) applyVol();
+    if (want && !cur) startMusic(want);
+  }
+  setInterval(onRunning, 1000);   // vakthund: retter opp hvis noe har stoppet underveis
   function init() {
+    // iOS: lydøkt og «medie»-lyd settes FØR konteksten lages/gjenopptas – endres økten etterpå, kan iOS avbryte konteksten
+    // (state «interrupted»), og da startet musikken først ved neste trykk (f.eks. lyd av/på).
+    if (!document.hidden) { session(); mediaKeepAlive(); }
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
       try { ctx = new AC(); } catch (e) { return; }
-      ctx.onstatechange = () => { dbg.state = ctx.state; if (ctx.state === 'interrupted' && !document.hidden) setTimeout(() => ctx.resume().catch(() => { }), 300); };
+      ctx.onstatechange = () => { dbg.state = ctx.state; if (ctx.state === 'running') onRunning(); if (ctx.state === 'interrupted' && !document.hidden) setTimeout(() => ctx.resume().catch(() => { }), 300); };
       master = ctx.createGain(); master.gain.value = 0;
       const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
-      master.connect(comp); comp.connect(ctx.destination);
+      ana = ctx.createAnalyser(); ana.fftSize = 512;   // måler utgangsnivået (brukes i tester)
+      master.connect(comp); comp.connect(ctx.destination); comp.connect(ana);
       musicBus = ctx.createGain(); musicBus.gain.value = 0.32; musicBus.connect(master);
       sfxBus = ctx.createGain(); sfxBus.gain.value = 0.8; sfxBus.connect(master);
       pulse = makePulse(0.25);
@@ -50,12 +68,12 @@ window.BBX = (() => {
     session();
     if (ctx.state !== 'running' && ctx.state !== 'closed' && !document.hidden) {   // 'suspended' eller iOS' 'interrupted'
       // Alt her skjer synkront i trykk-/tastehendelsen: iOS låser bare opp lyd direkte i brukerhandlingen
-      try { ctx.resume().catch(() => { }); } catch (e) { }
+      try { ctx.resume().then(onRunning, () => { }); } catch (e) { }
       try { const b = ctx.createBuffer(1, 1, ctx.sampleRate), s0 = ctx.createBufferSource(); s0.buffer = b; s0.connect(ctx.destination); s0.start(0); } catch (e) { }
     }
-    mediaKeepAlive();
     dbg.started = true;
     if (want && !cur) startMusic(want);
+    onRunning();
   }
   // --- iOS/iPadOS: lydøkt og stillebryter ---
   // iOS demper WebAudio når ringe-/stillebryteren står på «stille», med mindre siden har lydøkt «playback».
@@ -77,10 +95,10 @@ window.BBX = (() => {
   function mediaKeepAlive() {
     if (!IOS || navigator.audioSession || micActive || document.hidden) return;
     if (!keep) { keep = document.createElement('audio'); keep.src = silentWav(); keep.loop = true; keep.setAttribute('playsinline', ''); keep.setAttribute('x-webkit-airplay', 'deny'); keep.preload = 'auto'; }
-    if (keep.paused) keep.play().then(() => { dbg.keep = true; }).catch(() => { dbg.keep = false; });
+    if (keep.paused) keep.play().then(() => { dbg.keep = true; if (ctx && ctx.state !== 'running') ctx.resume().then(onRunning, () => { }); }).catch(() => { dbg.keep = false; });
   }
   ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'click', 'keydown'].forEach(e => window.addEventListener(e, init, { passive: true, capture: true }));
-  function wake() { if (!ctx || document.hidden) return; session(); if (ctx.state !== 'running') ctx.resume().catch(() => { }); }
+  function wake() { if (!ctx || document.hidden) return; session(); if (ctx.state !== 'running') ctx.resume().then(onRunning, () => { }); else onRunning(); }
   document.addEventListener('visibilitychange', () => {
     if (!ctx) return;
     if (document.hidden) { ctx.suspend().catch(() => { }); if (keep) keep.pause(); } else wake();
@@ -405,9 +423,7 @@ window.BBX = (() => {
   #lbSlotLobby #lbPanel .bbx-tab th { padding:2px 4px 6px; font-size:10px; }
   #lbSlotLobby #lbPanel .bbx-tab td.nm { max-width:9em; }
   body > #lbPanel { display:none; }   /* utenfor start/lobby (under spill) vises listen ikke */
-  @media (min-width: 1100px) {
-    body[data-screen="game"] #bbxSnd { top:auto; right:auto; left:14px; bottom:14px; }   /* unna videorutene */
-  }
+  #bbxSnd.inhud { position:static; width:30px; height:30px; font-size:15px; box-shadow: inset -3px -3px 0 rgba(0,0,0,.35), inset 3px 3px 0 rgba(255,255,255,.35), 3px 3px 0 #000; }
   #over .bbx-board h2 { font-size:16px; }
   #over .bbx-tab { font-size:15px; margin:0; }
   #over .bbx-tab td { text-align:right; border-bottom:none; padding:5px 6px; }
@@ -427,8 +443,10 @@ window.BBX = (() => {
   return {
     init, music, jingle, sfx, toggleMute, cycleVol, get sound() { return Object.assign({}, snd); },
     micState, get ctxState() { return ctx ? ctx.state : 'none'; },
-    dock(id) { const el = $('lbPanel'), slot = $('lbSlot'); if (!el) return; const lob = $('lbSlotLobby'); const to = id === 'menu' && slot ? slot : id === 'lobby' && lob ? lob : document.body; if (el.parentNode !== to) to.appendChild(el); },
+    dock(id) { const el = $('lbPanel'), slot = $('lbSlot'); if (!el) return; const lob = $('lbSlotLobby'); const to = id === 'menu' && slot ? slot : id === 'lobby' && lob ? lob : document.body; if (el.parentNode !== to) to.appendChild(el);
+      const sb = $('bbxSnd'), ss = $('sndSlot'); if (sb) { const inGame = id === 'game' && ss; sb.classList.toggle('inhud', !!inGame); const t2 = inGame ? ss : document.body; if (sb.parentNode !== t2) t2.appendChild(sb); } },
     recordLocal, localTop, submitGlobal, globalTop, get globalOn() { return globalOn; }, table, renderMenu,
-    get debug() { return Object.assign({ ctx: ctx ? ctx.state : 'none' }, dbg); },
+    get level() { if (!ana) return 0; const d = new Float32Array(ana.fftSize); ana.getFloatTimeDomainData(d); let m = 0; for (const v of d) m = Math.max(m, Math.abs(v)); return +m.toFixed(4); },
+    get debug() { return Object.assign({ ctx: ctx ? ctx.state : 'none', gain: master ? +master.gain.value.toFixed(3) : null }, dbg); },
   };
 })();

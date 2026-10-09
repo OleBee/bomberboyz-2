@@ -202,6 +202,17 @@
   #lbSlotLobby { display:flex; min-width:0; }
   #lbSlotLobby #lbPanel { flex:1; margin:0; }
   @media (max-width: 1099px) { .lcols { grid-template-columns: 1fr; } #lbSlotLobby { display:none; } #lobby.screen { max-width:760px; } }
+  /* HUD-rad: spillerne i midten, lydknappen liten oppe til høyre (over brettet og videorutene) */
+  #hudrow { display:grid; grid-template-columns: 34px 1fr 34px; align-items:start; gap:6px; margin-bottom:6px; }
+  #hudrow #hud { margin-bottom:0; padding:0; }
+  #sndSlot { display:flex; justify-content:flex-end; }
+  @media (max-width: 599px) {   /* mobil: kompakt HUD så brettet og knappene får plass */
+    #hud, #hud.many { font-size:11px; gap:3px; }
+    #hud .hp, #hud.many .hp { padding:2px 4px; gap:3px; border-width:1px; }
+    #hud .hp b { max-width:5.5em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #hud .hp i { width:9px; height:9px; }
+    #hudrow { grid-template-columns: 0 1fr 30px; gap:4px; }
+  }
 </style>
 </head>
 <body data-screen="menu">
@@ -291,7 +302,7 @@
 
 <!-- SPILL -->
 <section id="game" class="screen">
-  <div id="hud"></div>
+  <div id="hudrow"><span></span><div id="hud"></div><span id="sndSlot"></span></div>
   <div id="stage">
   <div id="wrap">
     <canvas id="cv" width="240" height="208"></canvas>
