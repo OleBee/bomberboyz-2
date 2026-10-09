@@ -51,6 +51,8 @@ function start() {
     S.local = st;
     S.hasA = st.getAudioTracks().length > 0; S.hasV = st.getVideoTracks().length > 0;
     S.micOn = S.hasA; S.camOn = S.hasV;
+    if (window.BBX && BBX.micState) BBX.micState(S.hasA);   // iOS: hold spillyden i gang etter at mikrofonen er tatt i bruk
+    try { if (S.actx && S.actx.state !== 'running') S.actx.resume(); } catch (e) { }
     renderTiles(); renderCtl(); emitState(); reconcile();
   });
   clearInterval(S.timer); S.timer = setInterval(tick, 100);
@@ -59,6 +61,7 @@ function start() {
 
 function stop() {
   S.active = false;
+  if (window.BBX && BBX.micState) BBX.micState(false);
   for (const r of S.remotes.values()) { r.dead = true; try { r.call.close(); } catch (e) { } }
   S.remotes.clear(); S.retryAt.clear(); S.fails.clear();
   if (S.local) S.local.getTracks().forEach(t => t.stop());
@@ -194,7 +197,8 @@ function transceivers(r, kind) {
 function toggleHide() { S.hidden = !S.hidden; renderCtl(); for (const id of S.tiles.keys()) updateTile(id); }
 function tapForSound() {
   S.needTap = false;
-  try { if (S.actx && S.actx.state === 'suspended') S.actx.resume(); } catch (e) { }
+  try { if (S.actx && S.actx.state !== 'running') S.actx.resume(); } catch (e) { }
+  if (window.BBX && BBX.micState) BBX.micState(S.hasA);   // ta opp igjen spillyden i samme trykk
   for (const [id, t] of S.tiles) if (id !== 'me') { t.video.muted = false; t.video.play().catch(() => { }); }
   renderCtl();
 }

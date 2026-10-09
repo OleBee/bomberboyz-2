@@ -51,6 +51,7 @@
   .slot.empty { opacity:.45; }
   .slot .nm { font-weight:bold; } .slot .tag { font-size:12px; opacity:.7; }
   #game { max-width: 900px; padding:6px; }
+  body.bigmap #game { max-width: 1500px; }
   #hud { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-bottom:6px; font-size:14px; }
   .hp { display:flex; align-items:center; gap:6px; padding:4px 8px; background:#12151d; border:2px solid var(--edge); }
   #hud { padding: 0 54px; }
@@ -146,6 +147,11 @@
   #lbSlotLobby { display:flex; min-width:0; }
   #lbSlotLobby #lbPanel { flex:1; margin:0; }
   @media (max-width: 1099px) { .lcols { grid-template-columns: 1fr; } #lbSlotLobby { display:none; } #lobby.screen { max-width:760px; } }
+  /* Brettvalg på startskjermen (gjelder både rom du lager og spill mot boter) */
+  #mapPick { display:flex; align-items:center; gap:8px; margin:0 0 12px; }
+  #mapPick .lbl { font-weight:bold; color:var(--acc); font-size:15px; margin-right:2px; }
+  #mapPick button { flex:1; font-size:15px; padding:8px 8px; background:#b8bec8; }
+  #mapPick button.on { background:#7ec8ff; outline:3px solid #ffd23a; outline-offset:-3px; }
 </style>
 </head>
 <body data-screen="menu">
@@ -190,6 +196,11 @@
      <div class="err" id="menuErr"></div>
 
      <div class="msep"></div>
+     <div id="mapPick" role="group" aria-label="Brett">
+      <span class="lbl">Brett:</span>
+      <button type="button" data-m="big" class="on">Stort 27×23</button>
+      <button type="button" data-m="small">Vanlig 13×11</button>
+     </div>
      <h2>Spill alene</h2>
      <button class="big grey" id="btnSolo">Spill mot boter</button>
     </div>

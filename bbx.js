@@ -36,6 +36,7 @@ window.BBX = (() => {
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
       try { ctx = new AC(); } catch (e) { return; }
+      ctx.onstatechange = () => { dbg.state = ctx.state; if (ctx.state === 'interrupted' && !document.hidden) setTimeout(() => ctx.resume().catch(() => { }), 300); };
       master = ctx.createGain(); master.gain.value = 0;
       const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
       master.connect(comp); comp.connect(ctx.destination);
@@ -46,15 +47,47 @@ window.BBX = (() => {
       const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       applyVol();
     }
-    if (ctx.state === 'suspended' && !document.hidden) ctx.resume().catch(() => { });
+    session();
+    if (ctx.state !== 'running' && ctx.state !== 'closed' && !document.hidden) {   // 'suspended' eller iOS' 'interrupted'
+      // Alt her skjer synkront i trykk-/tastehendelsen: iOS låser bare opp lyd direkte i brukerhandlingen
+      try { ctx.resume().catch(() => { }); } catch (e) { }
+      try { const b = ctx.createBuffer(1, 1, ctx.sampleRate), s0 = ctx.createBufferSource(); s0.buffer = b; s0.connect(ctx.destination); s0.start(0); } catch (e) { }
+    }
+    mediaKeepAlive();
     dbg.started = true;
     if (want && !cur) startMusic(want);
   }
-  ['pointerdown', 'keydown', 'touchstart'].forEach(e => window.addEventListener(e, init, { passive: true }));
+  // --- iOS/iPadOS: lydøkt og stillebryter ---
+  // iOS demper WebAudio når ringe-/stillebryteren står på «stille», med mindre siden har lydøkt «playback».
+  // Safari 16.4+/iOS 17: navigator.audioSession. Eldre iOS: en stille <audio>-løkke flytter lyden til «medie»-kanalen.
+  const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let micActive = false, keep = null;
+  function session() {
+    const as = navigator.audioSession; if (!as) return;
+    const want = micActive ? 'play-and-record' : 'playback';   // med mikrofon (videochat) må økten kunne ta opp
+    try { if (as.type !== want) as.type = want; } catch (e) { }
+    dbg.session = as.type;
+  }
+  function silentWav() {   // 0,5 s stillhet, 8 kHz mono 8-bit
+    const n = 4000, b = new Uint8Array(44 + n), v = new DataView(b.buffer), w = (o, t) => { for (let i = 0; i < t.length; i++) b[o + i] = t.charCodeAt(i); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
+    b.fill(128, 44); let str = ''; for (let i = 0; i < b.length; i++) str += String.fromCharCode(b[i]); return 'data:audio/wav;base64,' + btoa(str);
+  }
+  function mediaKeepAlive() {
+    if (!IOS || navigator.audioSession || micActive || document.hidden) return;
+    if (!keep) { keep = document.createElement('audio'); keep.src = silentWav(); keep.loop = true; keep.setAttribute('playsinline', ''); keep.setAttribute('x-webkit-airplay', 'deny'); keep.preload = 'auto'; }
+    if (keep.paused) keep.play().then(() => { dbg.keep = true; }).catch(() => { dbg.keep = false; });
+  }
+  ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'click', 'keydown'].forEach(e => window.addEventListener(e, init, { passive: true, capture: true }));
+  function wake() { if (!ctx || document.hidden) return; session(); if (ctx.state !== 'running') ctx.resume().catch(() => { }); }
   document.addEventListener('visibilitychange', () => {
     if (!ctx) return;
-    if (document.hidden) ctx.suspend().catch(() => { }); else ctx.resume().catch(() => { });
+    if (document.hidden) { ctx.suspend().catch(() => { }); if (keep) keep.pause(); } else wake();
   });
+  window.addEventListener('pageshow', wake); window.addEventListener('focus', wake);
+  // Videochat: getUserMedia setter iOS i opptaksmodus og kan stoppe vår lydkontekst – ta den opp igjen etterpå
+  function micState(on) { micActive = !!on; if (keep && on) keep.pause(); session(); if (ctx && ctx.state !== 'running' && !document.hidden) ctx.resume().catch(() => { }); }
   const live = () => ctx && ctx.state === 'running';
 
   function tone(t, f, dur, g, wave, dest, f2) {
@@ -393,6 +426,7 @@ window.BBX = (() => {
 
   return {
     init, music, jingle, sfx, toggleMute, cycleVol, get sound() { return Object.assign({}, snd); },
+    micState, get ctxState() { return ctx ? ctx.state : 'none'; },
     dock(id) { const el = $('lbPanel'), slot = $('lbSlot'); if (!el) return; const lob = $('lbSlotLobby'); const to = id === 'menu' && slot ? slot : id === 'lobby' && lob ? lob : document.body; if (el.parentNode !== to) to.appendChild(el); },
     recordLocal, localTop, submitGlobal, globalTop, get globalOn() { return globalOn; }, table, renderMenu,
     get debug() { return Object.assign({ ctx: ctx ? ctx.state : 'none' }, dbg); },

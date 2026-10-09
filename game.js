@@ -3,10 +3,14 @@
 (() => {
 // ---------- Konstanter ----------
 const TS = 16, MAXP = 8;
-// Brett: «Vanlig» 13×11 eller «Stort» 25×21 (ca. fire ganger arealet). Verten velger i lobbyen.
+// Brett: «Stort» 27×23 (dobbelt så bredt og høyt som det vanlige, ca. fire ganger arealet) er standard; «Vanlig» 13×11 kan velges.
+const MAP_NAME = { big: 'Stort (27×23)', small: 'Vanlig (13×11)' };
+let prefMap = 'big';   // valgt på startskjermen eller i lobbyen; huskes på enheten
+try { const v = localStorage.getItem('bk-map'); if (v === 'big' || v === 'small') prefMap = v; } catch (e) { }
+function setPrefMap(id) { prefMap = id; try { localStorage.setItem('bk-map', id); } catch (e) { } const t = document.querySelectorAll('#mapPick button'); t.forEach(b => b.classList.toggle('on', b.dataset.m === id)); }
 const MAPS = {
   small: { c: 13, r: 11, sd: 90, step: 0.4, lim: 160, starts: [[0, 0], [12, 10], [12, 0], [0, 10], [6, 0], [6, 10], [0, 6], [12, 4]] },
-  big:   { c: 25, r: 21, sd: 140, step: 0.15, lim: 240, starts: [[0, 0], [24, 20], [24, 0], [0, 20], [12, 0], [12, 20], [0, 10], [24, 10]] },
+  big:   { c: 27, r: 23, sd: 150, step: 0.14, lim: 260, starts: [[0, 0], [26, 22], [26, 0], [0, 22], [14, 0], [12, 22], [0, 12], [26, 10]] },
 };
 let mapId = '', COLS, ROWS, FW, FH, N, STARTS, SPIRAL, SD_START, SD_STEP, ROUND_LIMIT;
 function setMap(id) {
@@ -513,6 +517,7 @@ const view = { x: 0, y: 0, w: 240, h: 208, init: false };
 function onMapChange() {
   world = mk(FW * TS, FH * TS); ctx = world.getContext('2d'); ctx.imageSmoothingEnabled = false;
   for (const k in disp) delete disp[k]; for (const k in dispB) delete dispB[k];
+  document.body.classList.toggle('bigmap', mapId === 'big');   // stort brett får bredere spilleflate
   view.init = false; fitView();
 }
 // Hele brettet vises hvis rutene blir store nok; ellers et utsnitt som følger deg (mobil, små skjermer)
@@ -524,7 +529,11 @@ function fitView() {
   const availH = Math.max(160, window.innerHeight - hudH - (touch ? 230 : 90));
   const ww = FW * TS, wh = FH * TS;
   let w = ww, h = wh;
-  if (Math.min(availW / ww, availH / wh) * TS < 26) {
+  if (mapId === 'big') {   // samme rutestørrelse som på vanlig brett – brettet skal se større ut, ikke bare krympes
+    const tilePx = Math.max(26, Math.min(availW / (15 * TS), availH / (13 * TS)) * TS);
+    w = Math.min(ww, Math.max(11, Math.min(21, Math.floor(availW / tilePx))) * TS);
+    h = Math.min(wh, Math.max(9, Math.floor(availH / tilePx)) * TS);
+  } else if (Math.min(availW / ww, availH / wh) * TS < 26) {
     w = Math.min(ww, Math.max(15, Math.floor(availW / 34)) * TS);
     h = Math.min(wh, Math.max(11, Math.floor(availH / 34)) * TS);
   }
@@ -802,7 +811,7 @@ window.addEventListener('touchstart', () => document.body.classList.add('touch')
 
 // ---------- Rom og nettverk ----------
 const net = { role: 'none', peer: null, conns: new Map(), hostConn: null, fast: new Map(), hostFast: null };
-const room = { code: '', members: [], scores: new Array(MAXP).fill(0), phase: 'lobby', map: 'small', board: {}, lb: [], round: 0 };
+const room = { code: '', members: [], scores: new Array(MAXP).fill(0), phase: 'lobby', map: 'big', board: {}, lb: [], round: 0 };
 // Rommets toppliste: verten teller seire/runder/drap per navn så lenge rommet lever
 function boardArr() {
   return Object.values(room.board).sort((a, b) => b.w - a.w || b.k - a.k || a.g - b.g).map(e => [e.n, e.w, e.g, e.k, e.b ? 1 : 0]);
@@ -850,7 +859,7 @@ function resetNet() {
   try { if (net.peer) net.peer.destroy(); } catch (e) { }
   net.role = 'none'; net.peer = null; net.conns.clear(); net.hostConn = null; net.fast.clear(); net.hostFast = null;
   resetPrediction();
-  game = null; lastSnap = null; room.members = []; room.scores = new Array(MAXP).fill(0); room.phase = 'lobby'; room.code = ''; room.map = 'small'; room.board = {}; room.lb = []; room.round = 0;
+  game = null; lastSnap = null; room.members = []; room.scores = new Array(MAXP).fill(0); room.phase = 'lobby'; room.code = ''; room.map = prefMap; room.board = {}; room.lb = []; room.round = 0;
   for (const k in disp) delete disp[k];
 }
 function leave(msg) {
@@ -870,7 +879,7 @@ function startHosting(offline) {
   room.members = [{ slot: 0, name: myName(), bot: false, me: true }];
   if (offline) {
     room.code = '';
-    for (let i = 0; i < 3; i++) addBot();
+    for (let i = 0; i < (room.map === 'big' ? 5 : 3); i++) addBot();   // stort brett: fem boter
     startRound();
     return;
   }
@@ -1078,7 +1087,7 @@ function renderLobby() {
   $('waitTxt').style.display = host ? 'none' : '';
   $('btnAddBot').disabled = room.members.length >= MAXP;
   $('btnMap').textContent = 'Brett: ' + (room.map === 'big' ? 'Stort' : 'Vanlig');
-  $('mapInfo').textContent = 'Brett: ' + (room.map === 'big' ? 'Stort (25×21, kameraet følger deg)' : 'Vanlig (13×11)') + ' · opptil 8 spillere';
+  $('mapInfo').textContent = 'Brett: ' + MAP_NAME[room.map === 'big' ? 'big' : 'small'] + (room.map === 'big' ? ', kameraet følger deg' : '') + ' · opptil 8 spillere';
   $('btnDelBot').disabled = !room.members.some(m => m.bot);
   $('btnStart').disabled = room.members.length < 2;
   $('btnStart').textContent = room.members.length < 2 ? 'Start (trenger minst 2)' : 'Start';
@@ -1128,7 +1137,9 @@ $('btnDelBot').onclick = () => {
   if (b) { room.members = room.members.filter(m => m !== b); room.scores[b.slot] = 0; hostLobbyUpdate(); }
 };
 $('btnStart').onclick = () => startRound();
-$('btnMap').onclick = () => { room.map = room.map === 'big' ? 'small' : 'big'; hostLobbyUpdate(); };
+$('btnMap').onclick = () => { room.map = room.map === 'big' ? 'small' : 'big'; setPrefMap(room.map); hostLobbyUpdate(); };
+document.querySelectorAll('#mapPick button').forEach(b => b.addEventListener('click', () => setPrefMap(b.dataset.m)));
+setPrefMap(prefMap);
 $('btnAgain').onclick = () => startRound();
 $('btnToLobby').onclick = () => { game = null; room.phase = 'lobby'; show('lobby'); hostLobbyUpdate(); };
 $('btnLeaveLobby').onclick = () => leave('');
@@ -1149,7 +1160,7 @@ if (inviteCode) { $('invitePanel').style.display = ''; $('inviteCode').textConte
 
 // ---------- Hovedløkke ----------
 buildTiles();
-setMap('small');
+setMap(prefMap);
 let lastT = performance.now(), simLast = performance.now();
 function simTick() {   // simulering/nett går også når fanen ikke tegner
   const now = performance.now(), dt = Math.min(1, (now - simLast) / 1000); simLast = now;
