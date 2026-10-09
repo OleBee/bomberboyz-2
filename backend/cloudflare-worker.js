@@ -1,4 +1,4 @@
-// BomberBoyz 2 – felles toppliste som Cloudflare Worker + D1 (alternativ til Supabase).
+// Super BomberBoyz – felles toppliste som Cloudflare Worker + D1 (alternativ til Supabase).
 // Oppsett: wrangler d1 create bomberboyz-top  →  kjør SCHEMA under  →  bind som env.DB  →  wrangler deploy.
 // bbx-config.js: { provider: 'worker', url: 'https://<worker>.workers.dev', key: 'x' }
 //

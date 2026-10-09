@@ -1,4 +1,4 @@
-/* BomberBoyz 2 – video- og lydchat (prototype).
+/* Super BomberBoyz – video- og lydchat (prototype).
    Full mesh av PeerJS MediaConnections mellom alle menneskelige spillere i rommet.
    Spill-løkka og datakanalen til verten er uavhengige av dette. */
 'use strict';

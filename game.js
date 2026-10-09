@@ -1,4 +1,4 @@
-/* BomberBoyz 2 – original retro bombespill. All grafikk tegnes i kode. */
+/* Super BomberBoyz – original retro bombespill. All grafikk tegnes i kode. */
 'use strict';
 (() => {
 // ---------- Konstanter ----------
@@ -979,7 +979,7 @@ $('btnCopy').onclick = async () => {
   try { await navigator.clipboard.writeText(v); } catch (e) { $('shareLink').select(); document.execCommand('copy'); }
   $('btnCopy').textContent = 'Kopiert!'; setTimeout(() => $('btnCopy').textContent = 'Kopier lenke', 1500);
 };
-$('btnShare').onclick = () => { navigator.share({ title: 'BomberBoyz 2', text: 'Bli med på BomberBoyz 2! Romkode: ' + room.code, url: shareUrl() }).catch(() => { }); };
+$('btnShare').onclick = () => { navigator.share({ title: 'Super BomberBoyz', text: 'Bli med på Super BomberBoyz! Romkode: ' + room.code, url: shareUrl() }).catch(() => { }); };
 
 // Navn og invitasjon fra lenke
 try { const saved = localStorage.getItem('bk-name') || ''; $('name').value = isDefaultName(saved) ? '' : saved; } catch (e) { }

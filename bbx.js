@@ -1,4 +1,4 @@
-/* BomberBoyz 2 – lyd, musikk og toppliste. Felles for / og /legacy/.
+/* Super BomberBoyz – lyd, musikk og toppliste. Felles for / og /legacy/.
    All musikk og alle lydeffekter er originale og lages med Web Audio mens spillet kjører
    (ingen lydfiler, ingen lånte melodier). */
 'use strict';

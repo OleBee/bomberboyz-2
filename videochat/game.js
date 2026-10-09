@@ -1,4 +1,4 @@
-/* BomberBoyz 2 – original retro bombespill. All grafikk tegnes i kode.
+/* Super BomberBoyz – original retro bombespill. All grafikk tegnes i kode.
    Med video- og lydchat (se video.js). Hovedversjonen uten video ligger på forsiden. */
 'use strict';
 (() => {
@@ -943,7 +943,7 @@ $('btnCopy').onclick = async () => {
   try { await navigator.clipboard.writeText(v); } catch (e) { $('shareLink').select(); document.execCommand('copy'); }
   $('btnCopy').textContent = 'Kopiert!'; setTimeout(() => $('btnCopy').textContent = 'Kopier lenke', 1500);
 };
-$('btnShare').onclick = () => { navigator.share({ title: 'BomberBoyz 2', text: 'Bli med på BomberBoyz 2! Romkode: ' + room.code, url: shareUrl() }).catch(() => { }); };
+$('btnShare').onclick = () => { navigator.share({ title: 'Super BomberBoyz', text: 'Bli med på Super BomberBoyz! Romkode: ' + room.code, url: shareUrl() }).catch(() => { }); };
 
 // Video/lyd: medie-tilstand sendes via verten slik at alle ser hvem som har kamera og mikrofon på
 BBAV.init({ icon: slot => { const c = mk(16, 16); c.getContext('2d').drawImage(robotSprite(slot, 'down', 0), 0, 0); return c; } });

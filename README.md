@@ -1,4 +1,4 @@
-# BomberBoyz 2
+# Super BomberBoyz
 
 Retro bombespill i nettleseren for 1–8 spillere. Spill online med venner uten egen server (WebRTC via PeerJS), eller alene mot boter.
 

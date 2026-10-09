@@ -1,4 +1,4 @@
-/* BomberBoyz 2 – innstillinger for felles (global) toppliste.
+/* Super BomberBoyz – innstillinger for felles (global) toppliste.
    Står url og key tomme, vises bare listen på denne enheten.
    Slå på global liste ved å fylle inn verdiene fra Supabase (Project Settings → API):
      provider: 'supabase', url: 'https://xxxx.supabase.co', key: '<anon public key>'

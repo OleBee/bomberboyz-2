@@ -1,4 +1,4 @@
--- BomberBoyz 2 – felles toppliste på Supabase (gratisnivå).
+-- Super BomberBoyz – felles toppliste på Supabase (gratisnivå).
 -- Lim inn hele filen i Supabase → SQL Editor → Run. Deretter: url + publishable/anon key i bbx-config.js.
 -- Nettleseren får bare lese topplisten og kalle submit_round(); tabellene kan ikke skrives direkte.
 
