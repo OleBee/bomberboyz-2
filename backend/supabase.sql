@@ -47,7 +47,7 @@ declare
 begin
   -- formkrav
   if p_room !~ '^[A-Z0-9]{4,8}$' or p_round < 1 or p_round > 1000 then raise exception 'ugyldig rom/runde'; end if;
-  if v_n < 2 or v_n > 4 then raise exception 'to til fire spillere'; end if;
+  if v_n < 2 or v_n > 8 then raise exception 'to til åtte spillere'; end if;
   select count(*) filter (where (x->>'win')::boolean), coalesce(sum((x->>'kills')::int), 0)
     into v_winners, v_kills from jsonb_array_elements(p_players) x;
   if v_winners > 1 or v_kills > v_n - 1 then raise exception 'umulig resultat'; end if;
@@ -62,7 +62,7 @@ begin
     v_name := left(regexp_replace(trim(p->>'name'), '[[:cntrl:]]', '', 'g'), 12);
     if v_name = '' or v_name ~* '^(spiller( ?[0-9]+)?|robo-.*)$' then continue; end if;   -- standardnavn og boter telles ikke
     insert into bb_players as t (name_key, name, wins, games, kills)
-      values (lower(v_name), v_name, case when (p->>'win')::boolean then 1 else 0 end, 1, least(greatest((p->>'kills')::int, 0), 3))
+      values (lower(v_name), v_name, case when (p->>'win')::boolean then 1 else 0 end, 1, least(greatest((p->>'kills')::int, 0), 7))
     on conflict (name_key) do update set
       name = excluded.name, wins = t.wins + excluded.wins, games = t.games + 1,
       kills = t.kills + excluded.kills, updated_at = now();

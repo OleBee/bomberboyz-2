@@ -19,7 +19,7 @@ Bruk `provider: 'worker'`, `url: 'https://<worker>.workers.dev'`, `key: 'x'`.
 
 ## Juks og misbruk
 - Bare verten sender inn, bare rom med minst to mennesker (ikke solo mot boter).
-- Serveren sjekker 2–4 spillere, maks én vinner, maks (spillere − 1) drap, navn 1–12 tegn, ingen like navn.
+- Serveren sjekker 2–8 spillere, maks én vinner, maks (spillere − 1) drap, navn 1–12 tegn, ingen like navn.
 - Samme runde kan ikke sendes to ganger. Maks én runde per rom per 15 s, maks 30 runder per IP per 10 min, maks 120 per minutt totalt.
 - Standardnavn («Spiller», «Spiller 2») og boter telles ikke. Man må ha spilt minst tre runder for å vises.
 - Spillet kjører hos verten, så en bestemt jukser kan fortsatt sende falske resultater innenfor grensene. Navn er ikke beskyttet (hvem som helst kan kalle seg «Ole»).

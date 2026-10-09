@@ -281,7 +281,7 @@ window.BBX = (() => {
   // Bare verten sender, bare rom med minst to mennesker, og serveren validerer og begrenser.
   async function submitGlobal(room, round, players) {
     if (!globalOn) return;
-    const humans = players.filter(p => !p.bot).map(p => ({ name: cleanName(p.name), win: !!p.win, kills: Math.max(0, Math.min(3, p.kills | 0)) }));
+    const humans = players.filter(p => !p.bot).map(p => ({ name: cleanName(p.name), win: !!p.win, kills: Math.max(0, Math.min(7, p.kills | 0)) }));
     if (humans.length < 2 || !room) return;
     const body = { p_room: String(room).slice(0, 8), p_round: round | 0, p_players: humans };
     try {

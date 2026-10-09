@@ -1,19 +1,20 @@
 # BomberBoyz 2
 
-Retro bombespill i nettleseren for 1–4 spillere, med video- og lydchat mellom spillerne. Spill online med venner uten egen server (WebRTC via PeerJS), eller alene mot boter.
+Retro bombespill i nettleseren for 1–8 spillere. Spill online med venner uten egen server (WebRTC via PeerJS), eller alene mot boter.
 
 **Spill her:** https://bomberboyz.no/
-**Gammel versjon uten video:** https://bomberboyz.no/legacy/
+**Med video- og lydchat (maks 4):** https://bomberboyz.no/videochat/
 
 - **Lag rom** gir en romkode og en lenke du kan dele. Venner åpner lenken og trykker **Bli med**.
 - Verten kan fylle tomme plasser med boter og trykker **Start**.
 - Styring: piltaster eller WASD, mellomrom = bombe. På mobil vises knapper under brettet.
-- Etter 90 sekunder begynner brettet å krympe.
+- Opptil 8 spillere. Verten velger «Brett: Vanlig (13×11) / Stort (25×21)». På stort brett vises hele brettet på store skjermer, ellers følger kameraet deg.
+- Etter 90 sekunder (stort brett: 140) begynner brettet å krympe.
 - Power-ups: 💣 flere bomber, 🔥 lengre flamme, ⚡ fart, 🥊 Boksehanske: dytt bomber (gå inn i en bombe, så glir den til den treffer noe).
 - Navnefeltet er tomt med «Spiller» som hint. Skriver du ingenting, heter du «Spiller».
 
-## Video og lyd
-- Kamera og mikrofon mellom alle i rommet (full mesh av PeerJS MediaConnections, maks 4), logikken ligger i `video.js`.
+## Videochat (/videochat/)
+- Kamera og mikrofon mellom alle i rommet (full mesh av PeerJS MediaConnections, maks 4), logikken ligger i `videochat/video.js`. Videochat-versjonen har vanlig brett og maks 4 spillere.
 - 320×240 @ 15 fps, ekkokansellering og støydemping, maks ca. 250 kbit/s video per mottaker.
 - Nekter du kamera/mikrofon, kan du fortsatt spille og se/høre de andre.
 
@@ -28,10 +29,10 @@ Retro bombespill i nettleseren for 1–4 spillere, med video- og lydchat mellom 
 - **Felles liste (alle enheter):** av til `bbx-config.js` fylles ut. Se `backend/README.md`.
 
 ## Struktur
-- `/` – videoversjonen (PeerJS-prefiks `bomberboyz2-video-v1-`).
-- `/legacy/` – originalversjonen uten video (PeerJS-prefiks `bomberboyz2-v1-`). Egne rom, kolliderer ikke.
-  Legacy har i tillegg opptil 8 spillere og valget «Brett: Vanlig (13×11) / Stort (25×21)». På stort brett vises hele brettet på store skjermer, ellers følger kameraet deg.
-- `bbx.js` – musikk, lyd og toppliste (felles for begge versjoner), `bbx-config.js` – innstillinger for felles toppliste.
-- `/video/` – videresender til `/` med romkode (`?rom=`) og hash bevart.
+- `/` – hovedversjonen uten video: 8 spillere, stort brett (PeerJS-prefiks `bomberboyz2-v1-`).
+- `/videochat/` – versjonen med video- og lydchat (PeerJS-prefiks `bomberboyz2-video-v1-`). Egne rom, kolliderer ikke.
+- `bbx.js` – musikk, lyd og toppliste (felles for begge), `bbx-config.js` – innstillinger for felles toppliste, `backend/` – server for felles toppliste.
+- Gamle adresser videresender med romkode (`?rom=`) og hash: `/legacy/` → `/`, `/video/` → `/videochat/`.
+- Navn, lokal toppliste og lydvalg lagres i nettleseren og deles av begge versjonene.
 
 All grafikk er original og tegnes i kode (`game.js`). PeerJS (MIT) ligger i `peerjs.min.js`.

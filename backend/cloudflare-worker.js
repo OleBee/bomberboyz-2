@@ -29,7 +29,7 @@ export default {
       let b; try { b = await req.json(); } catch { return json(o, { error: 'json' }, 400); }
       const ps = Array.isArray(b.p_players) ? b.p_players : [];
       const room = String(b.p_room || ''), round = b.p_round | 0;
-      if (!/^[A-Z0-9]{4,8}$/.test(room) || round < 1 || round > 1000 || ps.length < 2 || ps.length > 4) return json(o, { error: 'ugyldig' }, 400);
+      if (!/^[A-Z0-9]{4,8}$/.test(room) || round < 1 || round > 1000 || ps.length < 2 || ps.length > 8) return json(o, { error: 'ugyldig' }, 400);
       const names = ps.map(p => clean(p.name));
       const wins = ps.filter(p => p.win).length, kills = ps.reduce((s, p) => s + Math.max(0, p.kills | 0), 0);
       if (new Set(names.map(n => n.toLowerCase())).size !== ps.length || wins > 1 || kills > ps.length - 1) return json(o, { error: 'umulig' }, 400);
@@ -44,7 +44,7 @@ export default {
         const n = names[i]; if (!n || /^(spiller( ?\d+)?|robo-.*)$/i.test(n)) return;
         stmts.push(env.DB.prepare(`insert into players (name_key, name, wins, games, kills, updated_at) values (?, ?, ?, 1, ?, ?)
           on conflict(name_key) do update set name = excluded.name, wins = wins + excluded.wins, games = games + 1, kills = kills + excluded.kills, updated_at = excluded.updated_at`)
-          .bind(n.toLowerCase(), n, p.win ? 1 : 0, Math.min(3, Math.max(0, p.kills | 0)), now));
+          .bind(n.toLowerCase(), n, p.win ? 1 : 0, Math.min(7, Math.max(0, p.kills | 0)), now));
       });
       if (stmts.length) await env.DB.batch(stmts);
       return json(o, { ok: true });

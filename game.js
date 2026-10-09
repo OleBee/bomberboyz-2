@@ -1,27 +1,40 @@
-/* BomberBoyz 2 – original retro bombespill. All grafikk tegnes i kode.
-   Med video- og lydchat (se video.js). Gammel versjon uten video ligger i legacy/. */
+/* BomberBoyz 2 – original retro bombespill. All grafikk tegnes i kode. */
 'use strict';
 (() => {
 // ---------- Konstanter ----------
-const COLS = 13, ROWS = 11, TS = 16, FW = COLS + 2, FH = ROWS + 2, N = COLS * ROWS;
+const TS = 16, MAXP = 8;
+// Brett: «Vanlig» 13×11 eller «Stort» 25×21 (ca. fire ganger arealet). Verten velger i lobbyen.
+const MAPS = {
+  small: { c: 13, r: 11, sd: 90, step: 0.4, lim: 160, starts: [[0, 0], [12, 10], [12, 0], [0, 10], [6, 0], [6, 10], [0, 6], [12, 4]] },
+  big:   { c: 25, r: 21, sd: 140, step: 0.15, lim: 240, starts: [[0, 0], [24, 20], [24, 0], [0, 20], [12, 0], [12, 20], [0, 10], [24, 10]] },
+};
+let mapId = '', COLS, ROWS, FW, FH, N, STARTS, SPIRAL, SD_START, SD_STEP, ROUND_LIMIT;
+function setMap(id) {
+  if (!MAPS[id]) id = 'small';
+  if (id === mapId) return;
+  const m = MAPS[id]; mapId = id;
+  COLS = m.c; ROWS = m.r; FW = COLS + 2; FH = ROWS + 2; N = COLS * ROWS; STARTS = m.starts;
+  SD_START = m.sd; SD_STEP = m.step; ROUND_LIMIT = m.lim;
+  SPIRAL = (() => { const o = []; let x0 = 0, y0 = 0, x1 = COLS - 1, y1 = ROWS - 1;
+    while (x0 <= x1 && y0 <= y1) {
+      for (let x = x0; x <= x1; x++) o.push(y0 * COLS + x);
+      for (let y = y0 + 1; y <= y1; y++) o.push(y * COLS + x1);
+      if (y1 > y0) for (let x = x1 - 1; x >= x0; x--) o.push(y1 * COLS + x);
+      if (x1 > x0) for (let y = y1 - 1; y > y0; y--) o.push(y * COLS + x0);
+      x0++; y0++; x1--; y1--; }
+    return o; })();
+  if (typeof onMapChange === 'function') onMapChange();
+}
 const KICK_SPEED = 7;   // boksehanske: hvor mange ruter i sekundet en dyttet bombe glir
-const BOMB_TIME = 2.5, FLAME_TIME = 0.6, BURN_TIME = 0.6, READY_TIME = 1.4, ROUND_LIMIT = 160;
+const BOMB_TIME = 2.5, FLAME_TIME = 0.6, BURN_TIME = 0.6, READY_TIME = 1.4;
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const DIRKEY = { u: 'up', d: 'down', l: 'left', r: 'right' };
 const COLORS = [
   { c: '#e8483c', n: 'Rød' }, { c: '#3c7ae8', n: 'Blå' },
-  { c: '#f0c020', n: 'Gul' }, { c: '#a050e0', n: 'Lilla' }];
-const STARTS = [[0, 0], [12, 10], [12, 0], [0, 10]];
-const PEER_PREFIX = 'bomberboyz2-video-v1-';   // egne rom, kolliderer ikke med /legacy/ (bomberboyz2-v1-)
-const SD_START = 90, SD_STEP = 0.4;   // «tiden renner ut»: brettet krymper fra 90 s
-const SPIRAL = (() => { const o = []; let x0 = 0, y0 = 0, x1 = COLS - 1, y1 = ROWS - 1;
-  while (x0 <= x1 && y0 <= y1) {
-    for (let x = x0; x <= x1; x++) o.push(y0 * COLS + x);
-    for (let y = y0 + 1; y <= y1; y++) o.push(y * COLS + x1);
-    if (y1 > y0) for (let x = x1 - 1; x >= x0; x--) o.push(y1 * COLS + x);
-    if (x1 > x0) for (let y = y1 - 1; y > y0; y--) o.push(y * COLS + x0);
-    x0++; y0++; x1--; y1--; }
-  return o; })();
+  { c: '#f0c020', n: 'Gul' }, { c: '#a050e0', n: 'Lilla' },
+  { c: '#ff8a1a', n: 'Oransje' }, { c: '#20c8c8', n: 'Turkis' },
+  { c: '#ff6eb4', n: 'Rosa' }, { c: '#e4e6ee', n: 'Hvit' }];
+const PEER_PREFIX = 'bomberboyz2-v1-';
 const CODE_ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const $ = id => document.getElementById(id);
 
@@ -152,9 +165,10 @@ class Game {
     this.grid = new Array(N).fill('.');
     const safe = new Set();
     for (const [sx, sy] of STARTS) {
-      safe.add(sy * COLS + sx);
-      safe.add(sy * COLS + sx + (sx === 0 ? 1 : -1));
-      safe.add((sy + (sy === 0 ? 1 : -1)) * COLS + sx);
+      for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const x = sx + dx, y = sy + dy;
+        if (x >= 0 && y >= 0 && x < COLS && y < ROWS) safe.add(y * COLS + x);
+      }
     }
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
       const i = y * COLS + x;
@@ -166,7 +180,7 @@ class Game {
       alive: true, deathT: 0, maxBombs: 1, range: 2, speedLv: 0, glove: false, dir: 'down', moving: false,
       input: { dir: null, bomb: false }, ai: { cd: 0.5 + Math.random() * 0.5, jit: {}, jitT: 0, step: null, from: null } }));
     this.bombs = []; this.bombId = 0; this.flames = new Map(); this.burning = new Map();
-    this.kills = [0, 0, 0, 0];
+    this.kills = new Array(MAXP).fill(0);
     this.phase = 'play'; this.endT = 0; this.winner = -1; this.time = 0; this.exCount = 0; this.sdIdx = 0;
   }
   cell(x, y) { return (x < 0 || y < 0 || x >= COLS || y >= ROWS) ? '#' : this.grid[y * COLS + x]; }
@@ -467,7 +481,7 @@ function botThink(g, p, dt) {
 // ---------- Tilstand som sendes over nett ----------
 function snapshot(g) {
   return {
-    t: 's', ph: g.phase, g: g.grid.join(''), tm: +g.time.toFixed(2), ex: g.exCount, w: g.winner,
+    t: 's', mp: mapId, ph: g.phase, g: g.grid.join(''), tm: +g.time.toFixed(2), ex: g.exCount, w: g.winner,
     b: g.bombs.map(b => { const d = b.slide ? DIRS[b.slide] : [0, 0];
       return [b.x, b.y, +b.t.toFixed(2), +(d[0] * b.prog).toFixed(3), +(d[1] * b.prog).toFixed(3), b.id]; }),
     f: [...g.flames].map(([i, f]) => [i, f.k, +f.t.toFixed(2)]),
@@ -479,8 +493,43 @@ function snapshot(g) {
 }
 
 // ---------- Tegning ----------
-const cv = $('cv'), ctx = cv.getContext('2d');
-ctx.imageSmoothingEnabled = false;
+const cv = $('cv'), vctx = cv.getContext('2d');
+let world = mk(240, 208), ctx = world.getContext('2d');
+const view = { x: 0, y: 0, w: 240, h: 208, init: false };
+function onMapChange() {
+  world = mk(FW * TS, FH * TS); ctx = world.getContext('2d'); ctx.imageSmoothingEnabled = false;
+  for (const k in disp) delete disp[k]; for (const k in dispB) delete dispB[k];
+  view.init = false; fitView();
+}
+// Hele brettet vises hvis rutene blir store nok; ellers et utsnitt som følger deg (mobil, små skjermer)
+function fitView() {
+  if (!FW) return;
+  const touch = document.body.classList.contains('touch');
+  const availW = Math.max(200, ($('wrap').clientWidth || window.innerWidth) - 4);
+  const hudH = $('hud').offsetHeight || 30;
+  const availH = Math.max(160, window.innerHeight - hudH - (touch ? 230 : 90));
+  const ww = FW * TS, wh = FH * TS;
+  let w = ww, h = wh;
+  if (Math.min(availW / ww, availH / wh) * TS < 26) {
+    w = Math.min(ww, Math.max(15, Math.floor(availW / 34)) * TS);
+    h = Math.min(wh, Math.max(11, Math.floor(availH / 34)) * TS);
+  }
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  vctx.imageSmoothingEnabled = false;
+  view.w = w; view.h = h;
+  const sc = Math.min(availW / w, availH / h);
+  cv.style.width = Math.floor(w * sc) + 'px'; cv.style.height = Math.floor(h * sc) + 'px';
+}
+window.addEventListener('resize', fitView);
+function present(dt) {
+  const ww = FW * TS, wh = FH * TS, me = disp[mySlot];
+  let tx = ww / 2 - view.w / 2, ty = wh / 2 - view.h / 2;
+  if (me) { tx = (me.x + 1) * TS + 8 - view.w / 2; ty = (me.y + 1) * TS + 8 - view.h / 2; }
+  tx = Math.max(0, Math.min(ww - view.w, tx)); ty = Math.max(0, Math.min(wh - view.h, ty));
+  const k = view.init ? Math.min(1, dt * 7) : 1; view.init = true;
+  view.x += (tx - view.x) * k; view.y += (ty - view.y) * k;
+  vctx.drawImage(world, Math.round(view.x), Math.round(view.y), view.w, view.h, 0, 0, view.w, view.h);
+}
 const disp = {}; // glattede posisjoner per spiller
 const dispB = {}; // glattede posisjoner per bombe
 function circle(c, cx, cy, r, col) {
@@ -598,8 +647,8 @@ function render(s, now, dt) {
   if (s.ph === 'play' && (s.tm < READY_TIME + 0.6 || warn)) {
     const txt = warn ? 'BRETTET KRYMPER!' : s.tm < READY_TIME ? 'KLAR …' : 'KJØR!';
     ctx.font = (warn ? 'bold 16px' : 'bold 22px') + ' "Courier New", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.strokeText(txt, cv.width / 2, cv.height / 2);
-    ctx.fillStyle = '#ffd23a'; ctx.fillText(txt, cv.width / 2, cv.height / 2);
+    ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.strokeText(txt, Math.round(view.x) + view.w / 2, Math.round(view.y) + view.h / 2);
+    ctx.fillStyle = '#ffd23a'; ctx.fillText(txt, Math.round(view.x) + view.w / 2, Math.round(view.y) + view.h / 2);
   }
 }
 
@@ -631,7 +680,7 @@ window.addEventListener('touchstart', () => document.body.classList.add('touch')
 
 // ---------- Rom og nettverk ----------
 const net = { role: 'none', peer: null, conns: new Map(), hostConn: null };
-const room = { code: '', members: [], scores: [0, 0, 0, 0], phase: 'lobby', board: {}, lb: [], round: 0 };
+const room = { code: '', members: [], scores: new Array(MAXP).fill(0), phase: 'lobby', map: 'small', board: {}, lb: [], round: 0 };
 // Rommets toppliste: verten teller seire/runder/drap per navn så lenge rommet lever
 function boardArr() {
   return Object.values(room.board).sort((a, b) => b.w - a.w || b.k - a.k || a.g - b.g).map(e => [e.n, e.w, e.g, e.k, e.b ? 1 : 0]);
@@ -663,12 +712,7 @@ function myName() {
   try { if (n && !isDefaultName(n)) localStorage.setItem('bk-name', n); else localStorage.removeItem('bk-name'); } catch (e) { }
   return n || 'Spiller';
 }
-function show(id) {
-  if (id === 'menu') BBX.renderMenu();
-  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  const bar = $('avbar'), dest = id === 'game' ? $('avGame') : id === 'lobby' ? $('avLobby') : null;
-  if (dest && bar.parentNode !== dest) dest.appendChild(bar);
-}
+function show(id) { if (id === 'menu') BBX.renderMenu(); document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
 function menuErr(t) { $('menuErr').textContent = t || ''; }
 function genCode() { let s = ''; for (let i = 0; i < 5; i++) s += CODE_ABC[Math.floor(Math.random() * CODE_ABC.length)]; return s; }
 function parseCode(v) {
@@ -681,10 +725,9 @@ function parseCode(v) {
 function shareUrl() { return location.origin + location.pathname + '?rom=' + room.code; }
 
 function resetNet() {
-  BBAV.stop();
   try { if (net.peer) net.peer.destroy(); } catch (e) { }
   net.role = 'none'; net.peer = null; net.conns.clear(); net.hostConn = null;
-  game = null; lastSnap = null; room.members = []; room.scores = [0, 0, 0, 0]; room.phase = 'lobby'; room.code = ''; room.board = {}; room.lb = []; room.round = 0;
+  game = null; lastSnap = null; room.members = []; room.scores = new Array(MAXP).fill(0); room.phase = 'lobby'; room.code = ''; room.map = 'small'; room.board = {}; room.lb = []; room.round = 0;
   for (const k in disp) delete disp[k];
 }
 function leave(msg) {
@@ -693,13 +736,8 @@ function leave(msg) {
 }
 
 // --- Vert ---
-function freeSlot() { for (let s = 0; s < 4; s++) if (!room.members.some(m => m.slot === s)) return s; return -1; }
-function lobbyMsg() { return { t: 'lobby', lb: boardArr(), code: room.code, phase: room.phase, members: room.members.map(m => ({ slot: m.slot, name: m.name, bot: !!m.bot,
-  peerId: m.me ? (net.peer && net.peer.id) || '' : m.peerId || '', av: m.me ? BBAV.state() : m.av || null })) }; }
-function avSync() {
-  if (net.role === 'none' || !room.code) return;
-  BBAV.sync(lobbyMsg().members, net.peer && net.peer.id, mySlot);
-}
+function freeSlot() { for (let s = 0; s < MAXP; s++) if (!room.members.some(m => m.slot === s)) return s; return -1; }
+function lobbyMsg() { return { t: 'lobby', mp: room.map, lb: boardArr(), code: room.code, phase: room.phase, members: room.members.map(m => ({ slot: m.slot, name: m.name, bot: !!m.bot })) }; }
 function broadcast(msg) { for (const c of net.conns.values()) { if (c.open) { try { c.send(msg); } catch (e) { } } } }
 function hostLobbyUpdate() { broadcast(lobbyMsg()); renderLobby(); }
 
@@ -714,11 +752,10 @@ function startHosting(offline) {
     return;
   }
   menuErr('Lager rom …');
-  BBAV.start();
   const tryOpen = (attempt) => {
     const code = genCode();
     const peer = new Peer(PEER_PREFIX + code, { debug: 1 });
-    net.peer = peer; BBAV.attachPeer(peer);
+    net.peer = peer;
     peer.on('open', () => {
       room.code = code; menuErr('');
       history.replaceState(null, '', '?rom=' + code);
@@ -755,8 +792,7 @@ function hostOnData(conn, d) {
     }
     if (s < 0) { conn.send({ t: 'full' }); setTimeout(() => conn.close(), 500); return; }
     const name = String(d.name || '').trim().slice(0, 12) || ('Spiller ' + (s + 1));
-    room.members.push({ slot: s, name, bot: false, conn, peerId: conn.peer, input: { dir: null }, lastBs: 0,
-      av: d.av ? { mic: !!d.av.mic, cam: !!d.av.cam } : null });
+    room.members.push({ slot: s, name, bot: false, conn, peerId: conn.peer, input: { dir: null }, lastBs: 0 });
     room.members.sort((a, b) => a.slot - b.slot);
     net.conns.set(conn.peer, conn);
     conn.send({ t: 'welcome', slot: s });
@@ -769,9 +805,6 @@ function hostOnData(conn, d) {
     const p = game && game.players.find(p => p.slot === m.slot);
     if (p) { p.input.dir = dir; if (typeof d.b === 'number' && d.b > m.lastBs) p.input.bomb = true; }
     if (typeof d.b === 'number') m.lastBs = Math.max(m.lastBs, d.b);
-  } else if (d.t === 'av') {
-    const m = room.members.find(m => m.peerId === conn.peer); if (!m) return;
-    m.av = { mic: !!d.mic, cam: !!d.cam }; hostLobbyUpdate();
   }
 }
 function hostDrop(conn) {
@@ -789,11 +822,11 @@ function hostDrop(conn) {
 function startRound() {
   if (room.members.length < 2) { $('lobbyErr').textContent = 'Dere må være minst to. Legg til en bot eller vent på venner.'; return; }
   $('lobbyErr').textContent = '';
-  game = new Game(room.members);
+  setMap(room.map); game = new Game(room.members);
   for (const m of room.members) if (m.peerId) m.lastBs = m.lastBs || 0;
   room.phase = 'play'; room.round++; scored = false; localBs = bombSeq;
   for (const k in disp) delete disp[k];
-  show('game'); $('over').classList.remove('on');
+  show('game'); fitView(); $('over').classList.remove('on');
   lastSnap = snapshot(game);
   broadcast(lobbyMsg()); broadcast(lastSnap);
 }
@@ -817,15 +850,14 @@ function joinRoom(code) {
   resetNet();
   net.role = 'client'; room.code = code;
   menuErr('Kobler til rom ' + code + ' …');
-  BBAV.start();
   const peer = new Peer({ debug: 1 });
-  net.peer = peer; BBAV.attachPeer(peer);
+  net.peer = peer;
   clearTimeout(joinTimer);
   joinTimer = setTimeout(() => { if (net.role === 'client' && !net.hostConn?.open) leave('Fikk ikke kontakt med rom ' + code + '. Sjekk koden, eller prøv igjen.'); }, 20000);
   peer.on('open', () => {
     const conn = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: 'json' });
     net.hostConn = conn;
-    conn.on('open', () => { conn.send({ t: 'hello', name: isDefaultName(myName()) ? '' : myName(), av: BBAV.state() }); });
+    conn.on('open', () => { conn.send({ t: 'hello', name: isDefaultName(myName()) ? '' : myName() }); });
     conn.on('data', clientOnData);
     conn.on('close', () => { if (net.role === 'client') leave('Forbindelsen til verten ble brutt.'); });
     conn.on('error', () => { });
@@ -838,14 +870,15 @@ function joinRoom(code) {
 function clientOnData(d) {
   if (!d || typeof d !== 'object') return;
   if (d.t === 'welcome') { clearTimeout(joinTimer); mySlot = d.slot; menuErr(''); show('lobby'); }
-  else if (d.t === 'full') leave('Rommet er fullt (maks fire spillere).');
+  else if (d.t === 'full') leave('Rommet er fullt (maks åtte spillere).');
   else if (d.t === 'lobby') {
-    room.members = d.members; room.phase = d.phase; room.code = d.code; room.lb = d.lb || room.lb;
+    room.members = d.members; room.phase = d.phase; room.code = d.code; room.map = d.mp || 'small'; room.lb = d.lb || room.lb;
     if (d.phase === 'lobby') { show('lobby'); }
     renderLobby();
   } else if (d.t === 's') {
+    if (d.mp && d.mp !== mapId) setMap(d.mp);
     lastSnap = d; room.scores = d.sc || room.scores; room.lb = d.lb || room.lb;
-    if (!inGame() && room.members.some(m => m.slot === mySlot)) { for (const k in disp) delete disp[k]; show('game'); }
+    if (!inGame() && room.members.some(m => m.slot === mySlot)) { for (const k in disp) delete disp[k]; show('game'); fitView(); }
   }
 }
 function clientTick() {
@@ -870,7 +903,7 @@ function renderLobby() {
   $('shareLink').value = room.code ? shareUrl() : '';
   $('btnShare').style.display = navigator.share ? '' : 'none';
   const el = $('slots'); el.innerHTML = '';
-  for (let s = 0; s < 4; s++) {
+  for (let s = 0; s < MAXP; s++) {
     const m = room.members.find(m => m.slot === s);
     const div = document.createElement('div'); div.className = 'slot' + (m ? '' : ' empty');
     div.appendChild(slotIcon(s));
@@ -885,23 +918,25 @@ function renderLobby() {
   $('hostCtl').style.display = host ? '' : 'none';
   $('btnStart').style.display = host ? '' : 'none';
   $('waitTxt').style.display = host ? 'none' : '';
-  $('btnAddBot').disabled = room.members.length >= 4;
+  $('btnAddBot').disabled = room.members.length >= MAXP;
+  $('btnMap').textContent = 'Brett: ' + (room.map === 'big' ? 'Stort' : 'Vanlig');
+  $('mapInfo').textContent = 'Brett: ' + (room.map === 'big' ? 'Stort (25×21, kameraet følger deg)' : 'Vanlig (13×11)') + ' · opptil 8 spillere';
   $('btnDelBot').disabled = !room.members.some(m => m.bot);
   $('btnStart').disabled = room.members.length < 2;
   $('btnStart').textContent = room.members.length < 2 ? 'Start (trenger minst 2)' : 'Start';
-  avSync();
 }
 let hudKey = '', overKey = '';
 function updateHud(s) {
   const key = JSON.stringify(s.p.map(p => [p[0], p[3], p[7], p[8], p[9], p[10], p[12]]));
   if (key !== hudKey) {
-    hudKey = key; const hud = $('hud'); hud.innerHTML = '';
+    hudKey = key; const hud = $('hud'); hud.innerHTML = ''; hud.classList.toggle('many', s.p.length > 4);
     for (const p of s.p) {
       const d = document.createElement('div'); d.className = 'hp' + (p[3] ? '' : ' dead');
       d.innerHTML = `<i style="background:${COLORS[p[0]].c}"></i><b></b><span>💣${p[7]} 🔥${p[8]} ⚡${p[9]}${p[12] ? ' 🥊' : ''}</span>`;
       d.querySelector('b').textContent = p[10] + (p[0] === mySlot ? ' (deg)' : '');
       hud.appendChild(d);
     }
+    fitView();
   }
   $('netInfo').textContent = net.role === 'host' && room.code ? 'Rom ' + room.code : net.role === 'client' ? 'Rom ' + room.code : 'Mot boter';
   const ov = $('over');
@@ -934,6 +969,7 @@ $('btnDelBot').onclick = () => {
   if (b) { room.members = room.members.filter(m => m !== b); room.scores[b.slot] = 0; hostLobbyUpdate(); }
 };
 $('btnStart').onclick = () => startRound();
+$('btnMap').onclick = () => { room.map = room.map === 'big' ? 'small' : 'big'; hostLobbyUpdate(); };
 $('btnAgain').onclick = () => startRound();
 $('btnToLobby').onclick = () => { game = null; room.phase = 'lobby'; show('lobby'); hostLobbyUpdate(); };
 $('btnLeaveLobby').onclick = () => leave('');
@@ -945,16 +981,6 @@ $('btnCopy').onclick = async () => {
 };
 $('btnShare').onclick = () => { navigator.share({ title: 'BomberBoyz 2', text: 'Bli med på BomberBoyz 2! Romkode: ' + room.code, url: shareUrl() }).catch(() => { }); };
 
-// Video/lyd: medie-tilstand sendes via verten slik at alle ser hvem som har kamera og mikrofon på
-BBAV.init({ icon: slot => { const c = mk(16, 16); c.getContext('2d').drawImage(robotSprite(slot, 'down', 0), 0, 0); return c; } });
-BBAV.onState = st => {
-  if (net.role === 'host') { const me = room.members.find(m => m.me); if (me) { me.av = st; if (room.code) hostLobbyUpdate(); } }
-  else if (net.role === 'client' && net.hostConn && net.hostConn.open) { try { net.hostConn.send({ t: 'av', mic: st.mic, cam: st.cam }); } catch (e) { } }
-};
-
-// Lukker forbindelser ryddig når fanen lukkes, så de andre ser at du gikk med en gang
-window.addEventListener('pagehide', () => { if (net.role !== 'none') { BBAV.stop(); try { net.peer && net.peer.destroy(); } catch (e) { } } });
-
 // Navn og invitasjon fra lenke
 try { const saved = localStorage.getItem('bk-name') || ''; $('name').value = isDefaultName(saved) ? '' : saved; } catch (e) { }
 // Lagret navn markeres når feltet får fokus, så det du skriver erstatter det med en gang
@@ -964,6 +990,7 @@ if (inviteCode) { $('invitePanel').style.display = ''; $('inviteCode').textConte
 
 // ---------- Hovedløkke ----------
 buildTiles();
+setMap('small');
 let lastT = performance.now(), simLast = performance.now();
 setInterval(() => {   // simulering/nett går også når fanen ikke tegner
   const now = performance.now(), dt = (now - simLast) / 1000; simLast = now;
@@ -974,6 +1001,7 @@ function frame() {
   const now = performance.now(), dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
   if (inGame() && lastSnap) {
     render(lastSnap, now / 1000, dt);
+    present(dt);
     updateHud(lastSnap);
     lastEx = lastSnap.ex;
   }
@@ -1019,5 +1047,5 @@ function audioEvents(a, s) {
 requestAnimationFrame(frame);
 
 // Lesetilgang for testing
-window.bomberboyz = { get av() { return BBAV.debug; }, get snap() { return lastSnap; }, get game() { return game; }, get role() { return net.role; }, get slot() { return mySlot; }, get members() { return room.members; } };
+window.bomberboyz = { get snap() { return lastSnap; }, get game() { return game; }, get role() { return net.role; }, get slot() { return mySlot; }, get members() { return room.members; }, get map() { return mapId; }, get view() { return Object.assign({}, view); }, get room() { return room; } };
 })();
