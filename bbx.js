@@ -191,6 +191,7 @@ window.BBX = (() => {
       { w: 'triangle', g: 0.5, n: 'C3 - - - B2 - - - A#2 - - - A2 - - - - - - - . . . .' },
     ] },
   };
+  SONGS.hurry = { bpm: 184, loop: true, tracks: SONGS.battle.tracks };   // HURRY UP!: samme låt, raskere
   function parse(song) {
     if (song.parsed) return song.parsed;
     const tracks = song.tracks.map(tr => {
@@ -264,6 +265,8 @@ window.BBX = (() => {
     kick(t, b) { noise(t, 0.06, 0.6, 900, 'lowpass', b); tone(t, 420, 0.12, 0.35, 'pulse', b, 900); },
     death(t, b) { tone(t, 880, 0.7, 0.32, 'pulse', b, 70); tone(t + 0.02, 440, 0.7, 0.18, 'square', b, 50); },
     count(t, b) { tone(t, 880, 0.12, 0.3, 'pulse', b); },
+    hurry(t, b) { ['E6', 'C6', 'E6', 'C6', 'E6', 'G6'].forEach((n, i) => tone(t + i * 0.085, noteHz(n), 0.075, 0.32, 'pulse', b)); tone(t, 330, 0.5, 0.15, 'square', b, 660); },
+    thud(t, b) { noise(t, 0.2, 0.75, 420, 'lowpass', b, 90); tone(t, 95, 0.2, 0.6, 'sine', b, 38); },
     go(t, b) { tone(t, 1760, 0.28, 0.32, 'pulse', b); tone(t, 880, 0.28, 0.2, 'square', b); },
   };
   const lastSfx = {};

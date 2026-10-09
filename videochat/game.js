@@ -5,7 +5,7 @@
 // ---------- Konstanter ----------
 const COLS = 13, ROWS = 11, TS = 16, FW = COLS + 2, FH = ROWS + 2, N = COLS * ROWS;
 const KICK_SPEED = 7;   // boksehanske: hvor mange ruter i sekundet en dyttet bombe glir
-const BOMB_TIME = 2.5, FLAME_TIME = 0.6, BURN_TIME = 0.6, READY_TIME = 1.4, ROUND_LIMIT = 160;
+const BOMB_TIME = 2.5, FLAME_TIME = 0.6, BURN_TIME = 0.6, READY_TIME = 1.4;
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const DIRKEY = { u: 'up', d: 'down', l: 'left', r: 'right' };
 const COLORS = [
@@ -13,15 +13,25 @@ const COLORS = [
   { c: '#f0c020', n: 'Gul' }, { c: '#a050e0', n: 'Lilla' }];
 const STARTS = [[0, 0], [12, 10], [12, 0], [0, 10]];
 const PEER_PREFIX = 'bomberboyz2-video-v1-';   // egne rom, kolliderer ikke med forsiden (bomberboyz2-v1-)
-const SD_START = 90, SD_STEP = 0.4;   // «tiden renner ut»: brettet krymper fra 90 s
-const SPIRAL = (() => { const o = []; let x0 = 0, y0 = 0, x1 = COLS - 1, y1 = ROWS - 1;
-  while (x0 <= x1 && y0 <= y1) {
-    for (let x = x0; x <= x1; x++) o.push(y0 * COLS + x);
-    for (let y = y0 + 1; y <= y1; y++) o.push(y * COLS + x1);
-    if (y1 > y0) for (let x = x1 - 1; x >= x0; x--) o.push(y1 * COLS + x);
-    if (x1 > x0) for (let y = y1 - 1; y > y0; y--) o.push(y * COLS + x0);
-    x0++; y0++; x1--; y1--; }
-  return o; })();
+// Runderegler (klassisk): 3:00 per runde. Ved 2:30 (30 s igjen) kommer HURRY UP! – faste blokker faller i spiral
+// fra nederste venstre hjørne, med klokka langs ytterste ring og så neste ring innover, til tiden er ute.
+const ROUND_TIME = 180, HURRY_AT = 150, DROP_TIME = 0.45;   // DROP_TIME: skygge + fall før blokka smeller ned
+function spiralOrder(cols, rows, rings) {
+  const o = [];
+  for (let r = 0; r < rings; r++) {
+    const x0 = r, y0 = r, x1 = cols - 1 - r, y1 = rows - 1 - r;
+    if (x0 > x1 || y0 > y1) break;
+    for (let y = y1; y >= y0; y--) o.push(y * cols + x0);                        // opp langs venstre kant
+    for (let x = x0 + 1; x <= x1; x++) o.push(y0 * cols + x);                    // mot høyre langs toppen
+    if (x1 > x0) for (let y = y0 + 1; y <= y1; y++) o.push(y * cols + x1);       // ned langs høyre kant
+    if (y1 > y0) for (let x = x1 - 1; x > x0; x--) o.push(y1 * cols + x);        // mot venstre langs bunnen
+  }
+  return o;
+}
+// Testflagg: med bk-test=1 og bk-timescale=N går vertens klokke N ganger fortere (bare for automatiske tester)
+const TIME_SCALE = (() => { try { return localStorage.getItem('bk-test') === '1' ? Math.max(1, Math.min(60, +localStorage.getItem('bk-timescale') || 1)) : 1; } catch (e) { return 1; } })();
+const SPIRAL = spiralOrder(COLS, ROWS, 2);   // to ringer (80 blokker) – siste blokk lander rett før 3:00
+const SD_START = READY_TIME + HURRY_AT, ROUND_LIMIT = READY_TIME + ROUND_TIME, SD_STEP = (ROUND_TIME - HURRY_AT - 1.5) / SPIRAL.length;
 const CODE_ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const $ = id => document.getElementById(id);
 // ---------- Nett-takt ----------
@@ -181,7 +191,7 @@ class Game {
       input: { dir: null, bomb: false }, ai: { cd: 0.5 + Math.random() * 0.5, jit: {}, jitT: 0, step: null, from: null } }));
     this.bombs = []; this.bombId = 0; this.flames = new Map(); this.burning = new Map();
     this.kills = [0, 0, 0, 0];
-    this.phase = 'play'; this.endT = 0; this.winner = -1; this.time = 0; this.exCount = 0; this.sdIdx = 0;
+    this.phase = 'play'; this.endT = 0; this.winner = -1; this.time = 0; this.exCount = 0; this.sdIdx = 0; this.endWhy = '';
   }
   cell(x, y) { return (x < 0 || y < 0 || x >= COLS || y >= ROWS) ? '#' : this.grid[y * COLS + x]; }
   bombAt(x, y) { for (const b of this.bombs) if (b.x === x && b.y === y) return b; return null; }
@@ -238,6 +248,7 @@ class Game {
           this.phase = 'over';
           const a2 = this.players.filter(p => p.alive);
           this.winner = (a2.length === 1 && this.time <= ROUND_LIMIT + 2) ? a2[0].slot : -1;
+          this.endWhy = this.winner >= 0 ? 'win' : a2.length ? 'time' : 'all';   // uavgjort: tiden ute, eller alle døde samtidig
         }
       }
     }
@@ -358,7 +369,10 @@ function blast(g, b) {
 function dangerMap(g) {
   const d = new Float32Array(N).fill(Infinity);
   for (const i of g.flames.keys()) d[i] = 0;
-  if (g.time > SD_START - 3) for (let k = 0; k < 10 && g.sdIdx + k < SPIRAL.length; k++) d[SPIRAL[g.sdIdx + k]] = 0;
+  if (g.time > SD_START - 5) for (let k = g.sdIdx; k < SPIRAL.length; k++) {   // blokker som faller de neste 12 sekundene
+    const t = SD_START + k * SD_STEP - g.time; if (t > 12) break;
+    const i = SPIRAL[k]; d[i] = Math.min(d[i], Math.max(0, t - 0.4));
+  }
   const bl = g.bombs.map(b => blast(g, b)), eff = g.bombs.map(b => b.t);
   for (let it = 0; it < 3; it++)
     g.bombs.forEach((b, i) => g.bombs.forEach((o, j) => {
@@ -481,7 +495,7 @@ function botThink(g, p, dt) {
 // ---------- Tilstand som sendes over nett ----------
 function snapshot(g) {
   return {
-    t: 's', sq: ++snapSeq, ph: g.phase, g: g.grid.join(''), tm: +g.time.toFixed(2), ex: g.exCount, w: g.winner,
+    t: 's', sq: ++snapSeq, ph: g.phase, g: g.grid.join(''), tm: +g.time.toFixed(2), ex: g.exCount, w: g.winner, sd: g.sdIdx, ew: g.endWhy,
     b: g.bombs.map(b => { const d = b.slide ? DIRS[b.slide] : [0, 0];
       return [b.x, b.y, +b.t.toFixed(2), +(d[0] * b.prog).toFixed(3), +(d[1] * b.prog).toFixed(3), b.id]; }),
     f: [...g.flames].map(([i, f]) => [i, f.k, +f.t.toFixed(2)]),
@@ -717,12 +731,38 @@ function render(s, now, dt) {
     ctx.drawImage(robotSprite(slot, DIRKEY[dch] || 'down', frame), px, py - 2 - (frame ? 1 : 0));
     if (slot === mySlot) { ctx.fillStyle = '#ffffff'; ctx.fillRect(px + 7, py - 5, 2, 1); ctx.fillRect(px + 6, py - 6, 4, 1); }
   }
-  const warn = s.ph === 'play' && s.tm > SD_START - 3 && s.tm < SD_START + 1;
-  if (s.ph === 'play' && (s.tm < READY_TIME + 0.6 || warn)) {
-    const txt = warn ? 'BRETTET KRYMPER!' : s.tm < READY_TIME ? 'KLAR …' : 'KJØR!';
-    ctx.font = (warn ? 'bold 16px' : 'bold 22px') + ' "Courier New", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.strokeText(txt, cv.width / 2, cv.height / 2);
-    ctx.fillStyle = '#ffd23a'; ctx.fillText(txt, cv.width / 2, cv.height / 2);
+  if (s.ph === 'play' && s.tm > SD_START - DROP_TIME) {   // HURRY UP-blokker: skygge, fall og smell
+    const k0 = Math.max(0, Math.floor((s.tm - SD_START - 0.2) / SD_STEP));
+    for (let k = k0; k < SPIRAL.length; k++) {
+      const left = SD_START + k * SD_STEP - s.tm; if (left > DROP_TIME) break;
+      const i = SPIRAL[k], px = (i % COLS + 1) * TS, py = (((i / COLS) | 0) + 1) * TS;
+      if (!vis(px, py)) continue;
+      if (left > 0) {
+        const f = 1 - left / DROP_TIME, sh = 6 + Math.round(10 * f);
+        ctx.fillStyle = 'rgba(0,0,0,' + (0.2 + 0.4 * f).toFixed(2) + ')'; ctx.fillRect(px + ((16 - sh) >> 1), py + 16 - Math.max(3, sh >> 1), sh, Math.max(3, sh >> 1));
+        ctx.drawImage(SPR.solid, px, py - Math.round((1 - f) * (1 - f) * 64));
+      } else if (left > -0.2) {   // støv når den smeller ned
+        const r = -left * 50; ctx.fillStyle = '#e8e0cc';
+        for (let j = 0; j < 6; j++) { const a = j * 1.047; ctx.fillRect(Math.round(px + 7 + Math.cos(a) * (6 + r)), Math.round(py + 12 + Math.sin(a) * (2 + r * 0.4)), 2, 2); }
+      }
+    }
+  }
+  const hurry = s.ph === 'play' && s.tm >= SD_START && s.tm < SD_START + 2.6;
+  if (s.ph === 'play' && (s.tm < READY_TIME + 0.6 || hurry)) {
+    const cx = Math.round(view.x) + view.w / 2, cy = Math.round(view.y) + view.h / 2;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    if (hurry) {
+      const pop = Math.min(1, (s.tm - SD_START) / 0.18), size = Math.round(18 + 16 * pop);
+      ctx.font = 'bold ' + size + 'px "Courier New", monospace';
+      ctx.lineWidth = 6; ctx.strokeStyle = '#000'; ctx.strokeText('HURRY UP!', cx + 2, cy + 2);
+      ctx.lineWidth = 4; ctx.strokeStyle = '#c0391b'; ctx.strokeText('HURRY UP!', cx, cy);
+      ctx.fillStyle = Math.floor(now * 8) % 2 ? '#ffd23a' : '#ffffff'; ctx.fillText('HURRY UP!', cx, cy);
+    } else {
+      const txt = s.tm < READY_TIME ? 'KLAR …' : 'KJØR!';
+      ctx.font = 'bold 22px "Courier New", monospace';
+      ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.strokeText(txt, cx, cy);
+      ctx.fillStyle = '#ffd23a'; ctx.fillText(txt, cx, cy);
+    }
   }
 }
 
@@ -958,13 +998,13 @@ function startRound() {
   $('lobbyErr').textContent = '';
   game = new Game(room.members);
   for (const m of room.members) if (m.peerId) m.lastBs = m.lastBs || 0;
-  room.phase = 'play'; room.round++; scored = false; localBs = bombSeq;
+  room.phase = 'play'; room.round++; scored = false; localBs = bombSeq; sdSent = 0;
   for (const k in disp) delete disp[k];
   show('game'); $('over').classList.remove('on');
   lastSnap = snapshot(game);
   broadcast(lobbyMsg()); broadcast(lastSnap);
 }
-let scored = false, localBs = 0, sendAcc = 0, simAcc = 0, snapSeq = 0;
+let scored = false, localBs = 0, sendAcc = 0, simAcc = 0, snapSeq = 0, sdSent = 0;
 function sendSnap(snap) {
   for (const [id, c] of net.conns) {
     const f = net.fast.get(id), ch = f && f.open ? f : c;
@@ -975,13 +1015,14 @@ function hostTick(dt) {
   if (!game) return;
   const me = game.players.find(p => p.slot === 0);
   if (me) { me.input.dir = curDir(); if (bombSeq > localBs) { localBs = bombSeq; me.input.bomb = true; } }
-  simAcc = Math.min(simAcc + dt, 0.5);
+  simAcc = Math.min(simAcc + dt * TIME_SCALE, 0.5 * TIME_SCALE);
   let stepped = false;
   while (simAcc >= STEP) {
     game.step(STEP); simAcc -= STEP; stepped = true;
     for (const p of game.players) if (p.ack) p.ackN = (p.ackN || 0) + 1;
   }
   if (game.phase === 'over' && !scored) { scored = true; if (game.winner >= 0) room.scores[game.winner]++; hostScoreRound(game); room.phase = 'over'; }
+  if (game.sdIdx !== sdSent) { sdSent = game.sdIdx; if (net.conns.size) broadcast({ t: 'sd', i: sdSent, rn: room.round }); }   // nye blokker: pålitelig kanal
   if (stepped || !lastSnap) lastSnap = snapshot(game);
   sendAcc += dt;
   if (sendAcc >= SEND_DT) { sendAcc = Math.min(sendAcc - SEND_DT, SEND_DT); if (net.conns.size) sendSnap(lastSnap); }
@@ -1018,6 +1059,12 @@ function joinRoom(code) {
     else if (net.role === 'client' && !net.hostConn?.open) leave('Tilkoblingsfeil (' + e.type + '). Prøv igjen.');
   });
 }
+let sdKnown = null;
+function applySd(s) {
+  if (!sdKnown || s.rn !== sdKnown.rn || s.ph !== 'play' || (s.sd | 0) >= sdKnown.i || !s.g) return;
+  const a = s.g.split(''); for (let k = s.sd | 0; k < sdKnown.i && k < SPIRAL.length; k++) a[SPIRAL[k]] = '#';
+  s.g = a.join(''); s.sd = sdKnown.i;
+}
 function clientOnData(d) {
   if (!d || typeof d !== 'object') return;
   if (d.t === 'welcome') { clearTimeout(joinTimer); mySlot = d.slot; menuErr(''); show('lobby'); }
@@ -1026,8 +1073,12 @@ function clientOnData(d) {
     room.members = d.members; room.phase = d.phase; room.code = d.code; room.lb = d.lb || room.lb;
     if (d.phase === 'lobby') { show('lobby'); }
     renderLobby();
+  } else if (d.t === 'sd') {   // blokker landet (pålitelig) – legg dem inn med en gang
+    if (!sdKnown || sdKnown.rn !== d.rn || d.i > sdKnown.i) { sdKnown = { rn: d.rn, i: d.i }; if (lastSnap && lastSnap.rn === d.rn && (lastSnap.sd | 0) < d.i) BBX.sfx('thud'); }
+    if (lastSnap) applySd(lastSnap);
   } else if (d.t === 's') {
     if (d.sq && d.sq <= lastSq) return;   // utdatert (kom fram etter en nyere)
+    applySd(d);
     lastSq = d.sq || lastSq;
     lastSnap = d; onClientSnap(d); room.scores = d.sc || room.scores; room.lb = d.lb || room.lb;
     if (!inGame() && room.members.some(m => m.slot === mySlot)) { for (const k in disp) delete disp[k]; show('game'); }
@@ -1103,7 +1154,7 @@ function updateHud(s) {
     if (k !== overKey || !ov.classList.contains('on')) {
       overKey = k;
       const wp = s.p.find(p => p[0] === s.w);
-      $('wintxt').textContent = wp ? (wp[0] === mySlot ? 'Du vant runden! 🏆' : wp[10] + ' vant runden!') : 'Uavgjort!';
+      $('wintxt').textContent = wp ? (wp[0] === mySlot ? 'Du vant runden! 🏆' : wp[10] + ' vant runden!') : s.ew === 'time' ? 'UAVGJORT – tiden er ute!' : 'UAVGJORT – ingen overlevde!';
       const tb = $('score'); tb.innerHTML = '';
       const rows = s.lb && s.lb.length ? s.lb : s.p.map(p => [p[10], s.w === p[0] ? 1 : 0, 1, p[13] || 0, p[11]]);
       const tr = document.createElement('tr'), td = document.createElement('td');
@@ -1182,10 +1233,21 @@ function frame() {
     lastEx = lastSnap.ex;
   }
   if (lastSnap !== audSnap) { audioEvents(audSnap, lastSnap); audSnap = lastSnap; }
-  BBX.music(!inGame() ? 'menu' : lastSnap && lastSnap.ph === 'play' && lastSnap.tm >= READY_TIME ? 'battle' : null);
+  BBX.music(!inGame() ? 'menu' : lastSnap && lastSnap.ph === 'play' && lastSnap.tm >= READY_TIME ? (lastSnap.tm >= SD_START ? 'hurry' : 'battle') : null);
+  updateTimer();
   requestAnimationFrame(frame);
 }
-let audSnap = null, recorded = '';
+let audSnap = null, recorded = '', timerTxt = '';
+function updateTimer() {   // nedtelling i HUD-raden (3:00 → 0:00), rød og blinkende de siste 30 sekundene
+  const el = $('timer'); if (!el) return;
+  const s = lastSnap; let txt = '';
+  if (inGame() && s && s.p) {
+    const left = Math.max(0, Math.ceil(ROUND_LIMIT - Math.max(s.tm, READY_TIME)));
+    txt = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+    el.classList.toggle('hurry', s.ph === 'play' && s.tm >= SD_START);
+  }
+  if (txt !== timerTxt) { timerTxt = txt; el.textContent = txt; el.style.visibility = txt ? 'visible' : 'hidden'; }
+}
 function audioEvents(a, s) {
   if (!s || !s.p) return;
   if (a && (a.rn !== s.rn || s.tm < a.tm)) a = null;   // ny runde
@@ -1193,6 +1255,7 @@ function audioEvents(a, s) {
   if (s.ph === 'play') {
     if (pt < 0.05 && s.tm >= 0.05 || pt < 0.7 && s.tm >= 0.7) BBX.sfx('count');
     if (pt < READY_TIME && s.tm >= READY_TIME) BBX.sfx('go');
+    if (pt >= 0 && pt < SD_START && s.tm >= SD_START) BBX.sfx('hurry');
   }
   if (!a) return;
   const ids = new Set(a.b.map(b => b[5]));
@@ -1202,6 +1265,7 @@ function audioEvents(a, s) {
     else if ((b[3] || b[4]) && !prevSlide.get(b[5])) BBX.sfx('kick');
   }
   if (s.ex > a.ex) BBX.sfx('boom');
+  if ((s.sd | 0) > (a.sd | 0)) BBX.sfx('thud');
   const burn = new Set(a.x.map(x => x[0]));
   if (s.x.some(x => !burn.has(x[0]))) BBX.sfx('wall');
   for (const p of s.p) {
@@ -1223,5 +1287,5 @@ function audioEvents(a, s) {
 requestAnimationFrame(frame);
 
 // Lesetilgang for testing
-window.bomberboyz = { get av() { return BBAV.debug; }, get snap() { return lastSnap; }, get game() { return game; }, get role() { return net.role; }, get slot() { return mySlot; }, get members() { return room.members; } };
+window.bomberboyz = { get rules() { return { spiral: SPIRAL.slice(), sdStart: SD_START, sdStep: SD_STEP, limit: ROUND_LIMIT, ready: READY_TIME, cols: COLS, rows: ROWS }; }, get av() { return BBAV.debug; }, get snap() { return lastSnap; }, get game() { return game; }, get role() { return net.role; }, get slot() { return mySlot; }, get members() { return room.members; } };
 })();
