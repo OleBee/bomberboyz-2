@@ -522,7 +522,7 @@ function fitView() {
   const stacked = getComputedStyle(stage).flexDirection.startsWith('column');
   const avW = !stacked && av.offsetWidth ? av.offsetWidth + 12 : 0, avH = stacked && av.offsetHeight ? av.offsetHeight + 6 : 0;
   const FWc = cv.width / TS, FHc = cv.height / TS;
-  const availW = Math.max(120, W - padX - SH - avW - colWidth() - 12), availH = Math.max(100, H - padY - top - bar - SH - avH);
+  const availW = Math.max(120, W - padX - SH - avW - colWidth() - 8), availH = Math.max(100, H - padY - top - bar - SH - avH);
   const tile = Math.min(availW / FWc, availH / FHc);
   const dpr = window.devicePixelRatio || 1, t = Math.max(4, Math.floor(tile)), ti = Math.floor(tile * dpr / TS) * TS / dpr;
   const tt = ti >= TS / dpr && ti >= t * 0.9 ? ti : t;

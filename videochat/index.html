@@ -75,7 +75,7 @@
   body.touch.tside #touch > * { pointer-events:auto; }
   /* PC: spillerliste i kolonne til venstre for brettet (body.lcol settes i game.js) */
   .hp em { display:none; font-style:normal; }
-  body.lcol #playarea { display:flex; gap:12px; justify-content:safe center; align-items:stretch; }
+  body.lcol #playarea { display:flex; gap:8px; justify-content:safe center; align-items:stretch; }
   body.lcol #hudrow { display:flex; flex-direction:column; gap:8px; flex:0 0 200px; width:200px; max-width:none; margin:0; }
   body.lcol #hudrow > div:first-child:empty, body.lcol #hudrow > div:first-child:has(#timer[style*="display: none"]) { display:none; }
   body.lcol #timer { font-size:34px; min-width:0; text-align:left; padding:0 2px; }
@@ -90,6 +90,7 @@
   body.lcol #gamebar .gbtns { justify-content:space-between; align-items:center; }
   body.lcol #gamebar #sndSlot { display:flex; }
   body.lcol #playarea > #wrap, body.lcol #stage { flex:0 0 auto; width:auto; }
+  body.lcol #wrap { justify-content:flex-start; }   /* brettet helt inntil venstre (8 px fra kolonnen); skyggen til høyre */
   #btnFull { display:none !important; }
   /* ---------- Touch (alltid liggende): kompakt spillerkolonne med styrekorset nederst, bombeknapp til høyre ---------- */
   :root { --dp: clamp(40px, min(6vw, 13vh), 62px); --bomb: clamp(76px, min(10vw, 24vh), 110px); }
@@ -99,9 +100,9 @@
   body.touch.lcol #timer { font-size:20px; }
   /* spillerlista: én spiller per rad, øverst på linje med brettet (padding-top settes i fitView), like høye rader ned mot styrekorset */
   body.lcol #hud, body.lcol #hud.many { flex:1 1 auto; min-height:0; }
-  body.lcol #hud .hp, body.lcol #hud.many .hp { flex:1 1 0; min-height:0; max-height:72px; align-content:center; overflow:hidden; }
-  body.touch.lcol #hud, body.touch.lcol #hud.many { gap:4px; font-size:12px; }
-  body.touch.lcol #hud .hp, body.touch.lcol #hud.many .hp { grid-template-columns:12px 1fr auto; grid-template-areas:"i b e"; gap:0 6px; padding:2px 6px; max-height:72px; align-items:center; font-size:clamp(11px, 1.3vw, 15px); }
+  body.lcol #hud .hp, body.lcol #hud.many .hp { flex:0 0 auto; align-content:center; overflow:hidden; }   /* faste, kompakte rader (ingen strekking) */
+  body.touch.lcol #hud, body.touch.lcol #hud.many { gap:3px; font-size:12px; }
+  body.touch.lcol #hud .hp, body.touch.lcol #hud.many .hp { grid-template-columns:12px 1fr auto; grid-template-areas:"i b e"; gap:0 6px; padding:0 6px; height:clamp(18px, 4.4vh, 36px); box-sizing:border-box; align-items:center; font-size:clamp(11px, 1.3vw, 14px); }
   body.touch.lcol #hud .hp span { display:none; }
   body.touch.lcol #hud .hp i { width:12px; height:12px; }
   body.touch.lcol #hud .hp.me { border-color:#ffd23a; }
@@ -120,7 +121,7 @@
   body.touch #avGame #avctl button { font-size:16px; padding:5px 6px; }
   body.touch #avGame .vt-nm { font-size:10px; padding:1px 4px; }
   body.touch.lcol #playarea { justify-content:flex-start; }   /* kolonnen helt til venstre (samme marg som bombeknappen til høyre) */
-  body.touch.lcol #playarea > #wrap, body.touch.lcol #stage { align-self:center; margin-left:auto; margin-right:auto; }
+  body.touch.lcol #playarea > #wrap, body.touch.lcol #stage { align-self:center; }   /* brettet rett ved siden av kolonnen (8 px) */
   /* lyd, Avslutt og rominfo øverst i høyre hjørne (videochat: øverst i videokolonnen) */
   #topright { display:none; }
   body[data-screen=game] #topright { display:grid; grid-template-columns:auto; gap:5px 6px; align-items:center; justify-items:end; position:fixed; z-index:6;
