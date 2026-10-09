@@ -21,7 +21,7 @@ function spiralOrder(cols, rows, rings) {
 }
 // Testflagg: med bk-test=1 og bk-timescale=N går vertens klokke N ganger fortere (bare for automatiske tester)
 const TIME_SCALE = (() => { try { return localStorage.getItem('bk-test') === '1' ? Math.max(1, Math.min(60, +localStorage.getItem('bk-timescale') || 1)) : 1; } catch (e) { return 1; } })();
-const MAP_NAME = { big: 'Stort (27×23)', small: 'Vanlig (13×11)' };
+const MAP_NAME = { big: 'Big (27×23)', small: 'Classic (13×11)' };
 let prefMap = 'big';   // alltid stort brett (brettvalget er fjernet); bare automatiske tester (bk-test=1) kan be om vanlig brett med bk-map=small
 try { if (localStorage.getItem('bk-test') === '1' && localStorage.getItem('bk-map') === 'small') prefMap = 'small'; } catch (e) { }
 const MAPS = {
@@ -44,10 +44,10 @@ const BOMB_TIME = 2.5, FLAME_TIME = 0.6, BURN_TIME = 0.6, READY_TIME = 1.4;
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const DIRKEY = { u: 'up', d: 'down', l: 'left', r: 'right' };
 const COLORS = [
-  { c: '#e8483c', n: 'Rød' }, { c: '#3c7ae8', n: 'Blå' },
-  { c: '#f0c020', n: 'Gul' }, { c: '#a050e0', n: 'Lilla' },
-  { c: '#ff8a1a', n: 'Oransje' }, { c: '#20c8c8', n: 'Turkis' },
-  { c: '#ff6eb4', n: 'Rosa' }, { c: '#e4e6ee', n: 'Hvit' }];
+  { c: '#e8483c', n: 'Red' }, { c: '#3c7ae8', n: 'Blue' },
+  { c: '#f0c020', n: 'Yellow' }, { c: '#a050e0', n: 'Purple' },
+  { c: '#ff8a1a', n: 'Orange' }, { c: '#20c8c8', n: 'Teal' },
+  { c: '#ff6eb4', n: 'Pink' }, { c: '#e4e6ee', n: 'White' }];
 const PEER_PREFIX = 'bomberboyz2-v1-';
 const CODE_ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const $ = id => document.getElementById(id);
@@ -587,7 +587,7 @@ let fsArm = false;
 function autoFull() {
   fsArm = false;
   const d = document, el = d.documentElement;
-  const lock = () => { try { const o = screen.orientation; if (o && o.lock) o.lock('landscape').catch(() => {}); } catch (e) { } };   // Android; iOS kan ikke låse (da vises «Snu enheten»)
+  const lock = () => { try { const o = screen.orientation; if (o && o.lock) o.lock('landscape').catch(() => {}); } catch (e) { } };   // Android; iOS kan ikke låse (da vises «Rotate your device»)
   if (d.fullscreenElement || d.webkitFullscreenElement) { lock(); return; }
   if (!(d.fullscreenEnabled || d.webkitFullscreenEnabled)) return;
   const r = el.requestFullscreen || el.webkitRequestFullscreen;
@@ -864,7 +864,7 @@ function render(s, now, dt) {
       ctx.lineWidth = 4; ctx.strokeStyle = '#c0391b'; ctx.strokeText('HURRY UP!', cx, cy);
       ctx.fillStyle = Math.floor(now * 8) % 2 ? '#ffd23a' : '#ffffff'; ctx.fillText('HURRY UP!', cx, cy);
     } else {
-      const txt = s.tm < READY_TIME ? 'KLAR …' : 'KJØR!';
+      const txt = s.tm < READY_TIME ? 'READY …' : 'GO!';
       ctx.font = 'bold 22px "Courier New", monospace';
       ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.strokeText(txt, cx, cy);
       ctx.fillStyle = '#ffd23a'; ctx.fillText(txt, cx, cy);
@@ -960,12 +960,12 @@ function hostScoreRound(g) {
 }
 let mySlot = 0, game = null, lastSnap = null, lastEx = 0;
 
-function isDefaultName(n) { return /^spiller( ?\d+)?$/i.test(String(n || '').trim()); }
+function isDefaultName(n) { return /^(spiller|player)( ?\d+)?$/i.test(String(n || '').trim()); }
 function myName() {
   let n = ($('name').value || '').trim().slice(0, 12);
   // Tomt felt gir standardnavnet, men det lagres ikke – feltet skal ikke fylles med «Spiller» neste gang
   try { if (n && !isDefaultName(n)) localStorage.setItem('bk-name', n); else localStorage.removeItem('bk-name'); } catch (e) { }
-  return n || 'Spiller';
+  return n || 'Player';
 }
 function show(id) { document.body.dataset.screen = id; BBX.dock(id); if (id === 'menu') BBX.renderMenu(); document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
 function menuErr(t) { $('menuErr').textContent = t || ''; }
@@ -1007,7 +1007,7 @@ function startHosting(offline) {
     startRound();
     return;
   }
-  menuErr('Lager rom …');
+  menuErr('Creating room …');
   const tryOpen = (attempt) => {
     const code = genCode();
     const peer = new Peer(PEER_PREFIX + code, { debug: 1 });
@@ -1020,8 +1020,8 @@ function startHosting(offline) {
     peer.on('error', e => {
       if (e.type === 'unavailable-id' && attempt < 5) { peer.destroy(); tryOpen(attempt + 1); return; }
       if (e.type === 'peer-unavailable') return;
-      if (!room.code) { leave('Klarte ikke å lage rom (' + e.type + '). Sjekk nettet og prøv igjen.'); }
-      else console.warn('PeerJS-feil', e);
+      if (!room.code) { leave("Couldn't create a room (" + e.type + '). Check your connection and try again.'); }
+      else console.warn('PeerJS error', e);
     });
     peer.on('disconnected', () => { if (net.peer === peer && !peer.destroyed) setTimeout(() => { try { peer.reconnect(); } catch (e) { } }, 1000); });
     peer.on('connection', conn => {
@@ -1054,7 +1054,7 @@ function hostOnData(conn, d) {
       if (bot && room.phase !== 'play') { room.members = room.members.filter(m => m !== bot); s = freeSlot(); }
     }
     if (s < 0) { conn.send({ t: 'full' }); setTimeout(() => conn.close(), 500); return; }
-    const name = String(d.name || '').trim().slice(0, 12) || ('Spiller ' + (s + 1));
+    const name = String(d.name || '').trim().slice(0, 12) || ('Player ' + (s + 1));
     room.members.push({ slot: s, name, bot: false, conn, peerId: conn.peer, input: { dir: null }, lastBs: 0 });
     room.members.sort((a, b) => a.slot - b.slot);
     net.conns.set(conn.peer, conn);
@@ -1086,7 +1086,7 @@ function hostDrop(conn) {
   hostLobbyUpdate();
 }
 function startRound() {
-  if (room.members.length < 2) { $('lobbyErr').textContent = 'Dere må være minst to. Legg til en bot eller vent på venner.'; return; }
+  if (room.members.length < 2) { $('lobbyErr').textContent = 'You need at least two players. Add a bot or wait for friends.'; return; }
   $('lobbyErr').textContent = '';
   setMap(room.map); game = new Game(room.members);
   for (const m of room.members) if (m.peerId) m.lastBs = m.lastBs || 0;
@@ -1123,20 +1123,20 @@ function hostTick(dt) {
 // --- Klient ---
 let joinTimer = null, lastSent = '', lastSentT = 0;
 function joinRoom(code) {
-  if (!code) { menuErr('Skriv inn en gyldig romkode eller lenke.'); return; }
+  if (!code) { menuErr('Enter a valid room code or link.'); return; }
   resetNet();
   net.role = 'client'; room.code = code;
-  menuErr('Kobler til rom ' + code + ' …');
+  menuErr('Connecting to room ' + code + ' …');
   const peer = new Peer({ debug: 1 });
   net.peer = peer;
   clearTimeout(joinTimer);
-  joinTimer = setTimeout(() => { if (net.role === 'client' && !net.hostConn?.open) leave('Fikk ikke kontakt med rom ' + code + '. Sjekk koden, eller prøv igjen.'); }, 20000);
+  joinTimer = setTimeout(() => { if (net.role === 'client' && !net.hostConn?.open) leave("Couldn't reach room " + code + '. Check the code or try again.'); }, 20000);
   peer.on('open', () => {
     const conn = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: 'json' });
     net.hostConn = conn;
     conn.on('open', () => { conn.send({ t: 'hello', name: isDefaultName(myName()) ? '' : myName() }); });
     conn.on('data', clientOnData);
-    conn.on('close', () => { if (net.role === 'client') leave('Forbindelsen til verten ble brutt.'); });
+    conn.on('close', () => { if (net.role === 'client') leave('Lost the connection to the host.'); });
     conn.on('error', () => { });
     conn.on('open', () => {   // egen upålitelig kanal for input og tilstand
       const fc = peer.connect(PEER_PREFIX + code, { reliable: false, serialization: 'json', label: 'bbfast' });
@@ -1146,8 +1146,8 @@ function joinRoom(code) {
     });
   });
   peer.on('error', e => {
-    if (e.type === 'peer-unavailable') leave('Fant ikke rom ' + code + '. Er koden riktig, og er verten fortsatt i rommet?');
-    else if (net.role === 'client' && !net.hostConn?.open) leave('Tilkoblingsfeil (' + e.type + '). Prøv igjen.');
+    if (e.type === 'peer-unavailable') leave("Couldn't find room " + code + '. Is the code right, and is the host still in the room?');
+    else if (net.role === 'client' && !net.hostConn?.open) leave('Connection error (' + e.type + '). Try again.');
   });
 }
 let sdKnown = null;
@@ -1159,7 +1159,7 @@ function applySd(s) {
 function clientOnData(d) {
   if (!d || typeof d !== 'object') return;
   if (d.t === 'welcome') { clearTimeout(joinTimer); mySlot = d.slot; menuErr(''); show('lobby'); fsArm = !document.fullscreenElement; }
-  else if (d.t === 'full') leave('Rommet er fullt (maks åtte spillere).');
+  else if (d.t === 'full') leave('The room is full (max eight players).');
   else if (d.t === 'lobby') {
     room.members = d.members; room.phase = d.phase; room.code = d.code; room.map = d.mp || 'small'; room.lb = d.lb || room.lb;
     if (d.phase === 'lobby') { show('lobby'); }
@@ -1201,7 +1201,7 @@ function slotIcon(slot) {
 function renderLobby() {
   const host = net.role === 'host';
   $('lobbyCode').textContent = room.code || '—';
-  $('lobbyTitle').textContent = host ? 'Ditt rom – del koden med venner' : 'Du er med i rom';
+  $('lobbyTitle').textContent = host ? 'Your room – share the code with friends' : "You're in room";
   $('shareLink').value = room.code ? shareUrl() : '';
   $('btnShare').style.display = navigator.share ? '' : 'none';
   const el = $('slots'); el.innerHTML = '';
@@ -1210,21 +1210,21 @@ function renderLobby() {
     const div = document.createElement('div'); div.className = 'slot' + (m ? '' : ' empty');
     div.appendChild(slotIcon(s));
     const t = document.createElement('div');
-    t.innerHTML = m ? `<div class="nm"></div><div class="tag">${m.bot ? 'Bot' : (s === 0 ? 'Vert' : 'Spiller')}${s === mySlot && !m.bot ? ' · deg' : ''}</div>`
-      : `<div class="nm">Ledig plass</div><div class="tag">Venter …</div>`;
+    t.innerHTML = m ? `<div class="nm"></div><div class="tag">${m.bot ? 'Bot' : (s === 0 ? 'Host' : 'Player')}${s === mySlot && !m.bot ? ' · you' : ''}</div>`
+      : `<div class="nm">Open slot</div><div class="tag">Waiting …</div>`;
     if (m) t.querySelector('.nm').textContent = m.name;
     div.appendChild(t); el.appendChild(div);
   }
   const rb = $('roomBoard'); rb.innerHTML = '';
-  if (room.lb && room.lb.length) rb.appendChild(boardPanel(room.lb, 'BESTE I ROMMET'));
+  if (room.lb && room.lb.length) rb.appendChild(boardPanel(room.lb, 'BEST IN ROOM'));
   $('hostCtl').style.display = host ? '' : 'none';
   $('btnStart').style.display = host ? '' : 'none';
   $('waitTxt').style.display = host ? 'none' : '';
   $('btnAddBot').disabled = room.members.length >= MAXP;
-  $('mapInfo').textContent = 'Brett: ' + MAP_NAME[room.map === 'big' ? 'big' : 'small'] + '' + ' · opptil 8 spillere';
+  $('mapInfo').textContent = 'Board: ' + MAP_NAME[room.map === 'big' ? 'big' : 'small'] + '' + ' · up to 8 players';
   $('btnDelBot').disabled = !room.members.some(m => m.bot);
   $('btnStart').disabled = room.members.length < 2;
-  $('btnStart').textContent = room.members.length < 2 ? 'Start (trenger minst 2)' : 'Start';
+  $('btnStart').textContent = room.members.length < 2 ? 'Start (needs 2+)' : 'Start';
 }
 let hudKey = '', overKey = '', hudSnap = null;
 function updateHud(s) {
@@ -1234,24 +1234,24 @@ function updateHud(s) {
     hudKey = key; const hud = $('hud'); hud.innerHTML = ''; hud.classList.toggle('many', s.p.length > 4);
     for (const p of s.p) {
       const d = document.createElement('div'); d.className = 'hp' + (p[3] ? '' : ' dead') + (p[0] === mySlot ? ' me' : ''); d.title = p[10];
-      d.innerHTML = `<i style="background:${COLORS[p[0]].c}"></i><b></b><span>💣${p[7]} 🔥${p[8]} ⚡${p[9]}${p[12] ? ' 🥊' : ''}</span><em title="Seire">🏆${s.sc ? s.sc[p[0]] | 0 : 0}</em>`;
-      d.querySelector('b').textContent = p[10] + (p[0] === mySlot ? ' (deg)' : '');
+      d.innerHTML = `<i style="background:${COLORS[p[0]].c}"></i><b></b><span>💣${p[7]} 🔥${p[8]} ⚡${p[9]}${p[12] ? ' 🥊' : ''}</span><em title="Wins">🏆${s.sc ? s.sc[p[0]] | 0 : 0}</em>`;
+      d.querySelector('b').textContent = p[10] + (p[0] === mySlot ? ' (you)' : '');
       hud.appendChild(d);
     }
     fitView();
   }
-  $('netInfo').textContent = net.role === 'host' && room.code ? 'Rom ' + room.code : net.role === 'client' ? 'Rom ' + room.code : 'Mot boter';
+  $('netInfo').textContent = net.role === 'host' && room.code ? 'Room ' + room.code : net.role === 'client' ? 'Room ' + room.code : 'Vs bots';
   const ov = $('over');
   if (s.ph === 'over') {
     const k = s.w + '|' + JSON.stringify(s.sc) + JSON.stringify(s.lb) + net.role;
     if (k !== overKey || !ov.classList.contains('on')) {
       overKey = k;
       const wp = s.p.find(p => p[0] === s.w);
-      $('wintxt').textContent = wp ? (wp[0] === mySlot ? 'Du vant runden! 🏆' : wp[10] + ' vant runden!') : s.ew === 'time' ? 'UAVGJORT – tiden er ute!' : 'UAVGJORT – ingen overlevde!';
+      $('wintxt').textContent = wp ? (wp[0] === mySlot ? 'You won the round! 🏆' : wp[10] + ' won the round!') : s.ew === 'time' ? "DRAW – time's up!" : 'DRAW – nobody survived!';
       const tb = $('score'); tb.innerHTML = '';
       const rows = s.lb && s.lb.length ? s.lb : s.p.map(p => [p[10], s.w === p[0] ? 1 : 0, 1, p[13] || 0, p[11]]);
       const tr = document.createElement('tr'), td = document.createElement('td');
-      td.appendChild(boardPanel(rows, room.code ? 'BESTE I ROMMET' : 'STILLING')); tr.appendChild(td); tb.appendChild(tr);
+      td.appendChild(boardPanel(rows, room.code ? 'BEST IN ROOM' : 'STANDINGS')); tr.appendChild(td); tb.appendChild(tr);
       $('overHost').style.display = net.role === 'host' ? '' : 'none';
       $('btnToLobby').style.display = net.role === 'host' && room.code ? '' : 'none';
       $('overWait').style.display = net.role === 'host' ? 'none' : '';
@@ -1274,13 +1274,13 @@ $('btnStart').onclick = () => { autoFull(); startRound(); };
 $('btnAgain').onclick = () => startRound();
 $('btnToLobby').onclick = () => { game = null; room.phase = 'lobby'; show('lobby'); hostLobbyUpdate(); };
 $('btnLeaveLobby').onclick = () => leave('');
-$('btnQuit').onclick = () => { if (confirm('Avslutte spillet?')) leave(''); };
+$('btnQuit').onclick = () => { if (confirm('Quit the game?')) leave(''); };
 $('btnCopy').onclick = async () => {
   const v = $('shareLink').value;
   try { await navigator.clipboard.writeText(v); } catch (e) { $('shareLink').select(); document.execCommand('copy'); }
-  $('btnCopy').textContent = 'Kopiert!'; setTimeout(() => $('btnCopy').textContent = 'Kopier lenke', 1500);
+  $('btnCopy').textContent = 'Copied!'; setTimeout(() => $('btnCopy').textContent = 'Copy link', 1500);
 };
-$('btnShare').onclick = () => { navigator.share({ title: 'Super BomberBoyz', text: 'Bli med på Super BomberBoyz! Romkode: ' + room.code, url: shareUrl() }).catch(() => { }); };
+$('btnShare').onclick = () => { navigator.share({ title: 'Super BomberBoyz', text: 'Join me in Super BomberBoyz! Room code: ' + room.code, url: shareUrl() }).catch(() => { }); };
 
 // Navn og invitasjon fra lenke
 try { const saved = localStorage.getItem('bk-name') || ''; $('name').value = isDefaultName(saved) ? '' : saved; } catch (e) { }

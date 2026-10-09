@@ -283,7 +283,7 @@ window.BBX = (() => {
 
   // ---------- Lydknapp + M-tast ----------
   function sndIcon() { return snd.muted ? '🔇' : snd.vol <= 0.3 ? '🔈' : snd.vol <= 0.6 ? '🔉' : '🔊'; }
-  function saveSnd() { store.set('bk-sound', { vol: snd.vol, muted: snd.muted }); applyVol(); const b = $('bbxSnd'); if (b) { b.textContent = sndIcon(); b.title = snd.muted ? 'Lyd av (M)' : 'Lydstyrke ' + Math.round(snd.vol * 100) + ' % (M = av/på)'; } }
+  function saveSnd() { store.set('bk-sound', { vol: snd.vol, muted: snd.muted }); applyVol(); const b = $('bbxSnd'); if (b) { b.textContent = sndIcon(); b.title = snd.muted ? 'Sound off (M)' : 'Volume ' + Math.round(snd.vol * 100) + ' % (M = on/off)'; } }
   function toggleMute() { snd.muted = !snd.muted; saveSnd(); }
   function cycleVol() {   // 25 % → 50 % → 85 % → av → 25 % …
     if (snd.muted) { snd.muted = false; snd.vol = LEVELS[0]; }
@@ -333,24 +333,29 @@ window.BBX = (() => {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return (await r.json()).map(x => ({ n: cleanName(x.name), w: x.wins | 0, g: x.games | 0, k: x.kills | 0 }));
   }
+  // The server (Supabase SQL / worker) answers in Norwegian; map its messages to English for the console
+  const SERVER_MSG = { 'ugyldig rom/runde': 'invalid room or round', 'to til åtte spillere': 'needs two to eight players', 'umulig resultat': 'impossible result',
+    'like navn': 'duplicate player names', 'for raskt': 'too fast – one round per room every 15 s', 'for mange runder': 'too many rounds from this network', 'for mange': 'too many rounds from this network', 'travelt': 'server busy, try again later' };
+  function serverMsg(m) { const k = String(m || '').trim().toLowerCase(); return SERVER_MSG[k] || Object.keys(SERVER_MSG).filter(x => k.includes(x)).map(x => SERVER_MSG[x])[0] || m; }
   // Bare verten sender, bare rom med minst to mennesker, og serveren validerer og begrenser.
   async function submitGlobal(room, round, players) {
     if (!globalOn) return;
     try { if (localStorage.getItem('bk-test') === '1' || navigator.webdriver) return; } catch (e) { }   // automatiske tester/robotnettlesere sender ikke inn   // automatiske tester sender ikke inn
-    const humans = players.filter(p => !p.bot).map(p => ({ name: cleanName(p.name), win: !!p.win, kills: Math.max(0, Math.min(7, p.kills | 0)) }));
+    const humans = players.filter(p => !p.bot).map(p => ({ name: cleanName(p.name).replace(/^player( ?\d+)?$/i, 'Spiller$1'),   // the server skips default names by their Norwegian form ("Spiller", "Spiller 2")
+      win: !!p.win, kills: Math.max(0, Math.min(7, p.kills | 0)) }));
     if (humans.length < 2 || !room) return;
     const body = { p_room: String(room).slice(0, 8), p_round: round | 0, p_players: humans };
     try {
       const r = await fetch(GC.provider === 'worker' ? base + '/round' : base + '/rest/v1/rpc/submit_round',
         { method: 'POST', headers: GC.provider === 'worker' ? { 'Content-Type': 'application/json' } : hdrs(), body: JSON.stringify(body) });
-      if (!r.ok) console.warn('Toppliste: innsending avvist', r.status);
-    } catch (e) { console.warn('Toppliste: fikk ikke sendt resultat', e.message); }
+      if (!r.ok) { let m = ''; try { const j = await r.json(); m = String((j && (j.message || j.error)) || ''); } catch (e) { } console.warn('Leaderboard: submission rejected', r.status, serverMsg(m)); }
+    } catch (e) { console.warn('Leaderboard: could not send result', e.message); }
   }
 
   function table(rows, opts = {}) {
     const t = document.createElement('table'); t.className = 'bbx-tab';
     const head = document.createElement('tr');
-    head.innerHTML = '<th>#</th><th>Navn</th><th title="Seire">🏆</th><th title="Runder">Runder</th>' + (opts.kills === false ? '' : '<th title="Drap">💥</th>');
+    head.innerHTML = '<th>#</th><th>Name</th><th title="Wins">🏆</th><th title="Rounds">Rounds</th>' + (opts.kills === false ? '' : '<th title="Kills">💥</th>');
     t.appendChild(head);
     rows.forEach((r, i) => {
       const tr = document.createElement('tr'); if (r.me) tr.className = 'me';
@@ -367,14 +372,14 @@ window.BBX = (() => {
     const box = $('lbList'); if (!box) return;
     const me = cleanName(($('name') && $('name').value) || '').toLowerCase();
     const msg = t => { box.innerHTML = ''; const d = document.createElement('div'); d.className = 'bbx-empty'; d.textContent = t; box.appendChild(d); };
-    const EMPTY = 'Ingen spillere ennå – spill tre runder for å komme på lista';
+    const EMPTY = 'No players yet – play three rounds to make the list';
     if (!globalOn) { msg(EMPTY); return; }
-    if (!box.querySelector('table')) msg('Henter …');
+    if (!box.querySelector('table')) msg('Loading …');
     try {
       const rows = await globalTop(10);
       if (!rows || !rows.length) { msg(EMPTY); return; }
       box.innerHTML = ''; box.appendChild(table(rows.map(r => Object.assign({ me: me && r.n.toLowerCase() === me }, r))));
-    } catch (e) { msg('Kunne ikke hente lista'); }
+    } catch (e) { msg("Couldn't load the list"); }
   }
   function setupMenu() { renderMenu(); }
 
@@ -435,7 +440,7 @@ window.BBX = (() => {
     init, music, jingle, sfx, toggleMute, cycleVol, get sound() { return Object.assign({}, snd); },
     micState, get ctxState() { return ctx ? ctx.state : 'none'; },
     dock(id) { const el = $('lbPanel'), slot = $('lbSlot'); if (!el) return; const lob = $('lbSlotLobby'); const to = id === 'menu' && slot ? slot : id === 'lobby' && lob ? lob : document.body; if (el.parentNode !== to) to.appendChild(el); },
-    recordLocal, localTop, submitGlobal, globalTop, get globalOn() { return globalOn; }, table, renderMenu,
+    recordLocal, localTop, submitGlobal, globalTop, serverMsg, get globalOn() { return globalOn; }, table, renderMenu,
     get level() { if (!ana) return 0; const d = new Float32Array(ana.fftSize); ana.getFloatTimeDomainData(d); let m = 0; for (const v of d) m = Math.max(m, Math.abs(v)); return +m.toFixed(4); },
     get debug() { return Object.assign({ ctx: ctx ? ctx.state : 'none', gain: master ? +master.gain.value.toFixed(3) : null }, dbg); },
   };

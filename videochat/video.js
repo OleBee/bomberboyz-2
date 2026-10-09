@@ -22,28 +22,28 @@ const log = (...a) => { if (window.BBAV_DEBUG) console.log('[av]', ...a); };
 async function gum(c) { return navigator.mediaDevices.getUserMedia(c); }
 async function acquire() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    S.status = 'Kamera og mikrofon er ikke tilgjengelig her. Du ser og hører de andre.';
+    S.status = "Camera and mic aren't available here. You can still see and hear the others.";
     return new MediaStream();
   }
   const tries = [
     [{ audio: AUDIO_C, video: VIDEO_C }, ''],
-    [{ audio: AUDIO_C }, 'Fikk ikke kamera, bare mikrofon.'],
+    [{ audio: AUDIO_C }, 'No camera found – mic only.'],
   ];
   let lastErr = null;
   for (const [c, note] of tries) {
-    try { const st = await gum(c); S.status = note; return st; } catch (e) { lastErr = e; log('gUM feilet', e.name); }
+    try { const st = await gum(c); S.status = note; return st; } catch (e) { lastErr = e; log('gUM failed', e.name); }
   }
-  log('gUM sluttfeil', lastErr && lastErr.name);
+  log('gUM final error', lastErr && lastErr.name);
   S.errName = lastErr ? lastErr.name : '';
   const denied = lastErr && (lastErr.name === 'NotAllowedError' || lastErr.name === 'SecurityError');
-  S.status = denied ? 'Du har ikke gitt tilgang til kamera og mikrofon. Spillet virker likevel, og du ser og hører de andre.'
-    : 'Fant ikke kamera eller mikrofon. Du ser og hører de andre.';
+  S.status = denied ? "You didn't allow camera and mic. The game still works, and you can see and hear the others."
+    : "Couldn't find a camera or mic. You can still see and hear the others.";
   return new MediaStream();
 }
 
 function start() {
   if (S.active) return S.mediaP;
-  S.active = true; S.micOn = true; S.camOn = true; S.needTap = false; S.status = 'Ber om kamera og mikrofon …';
+  S.active = true; S.micOn = true; S.camOn = true; S.needTap = false; S.status = 'Asking for camera and mic …';
   try { S.actx = S.actx || new (window.AudioContext || window.webkitAudioContext)(); if (S.actx.state === 'suspended') S.actx.resume(); } catch (e) { }
   renderCtl();
   S.mediaP = acquire().then(st => {
@@ -80,7 +80,7 @@ function attachPeer(peer) {
   S.peer = peer;
   peer.on('call', call => {
     if (!S.active || peer !== S.peer) { try { call.close(); } catch (e) { } return; }
-    log('innkommende samtale fra', call.peer);
+    log('incoming call from', call.peer);
     Promise.resolve(S.mediaP).then(() => {
       if (!S.active) { try { call.close(); } catch (e) { } return; }
       wire(call, call.peer);
@@ -104,7 +104,7 @@ function wire(call, id) {
   S.remotes.set(id, r);
   call.on('stream', st => {
     if (r.dead) return;
-    r.stream = st; r.connected = true; S.fails.delete(id); log('strøm fra', id, st.getTracks().map(t => t.kind));
+    r.stream = st; r.connected = true; S.fails.delete(id); log('stream from', id, st.getTracks().map(t => t.kind));
     setTileStream(id, st); capBitrate(call);
   });
   const gone = () => {
@@ -180,7 +180,7 @@ async function toggleCam() {
     for (const r of S.remotes.values()) for (const tr of transceivers(r, 'video')) { try { tr.sender.replaceTrack(null); } catch (e) { } }
   } else {
     let st;
-    try { st = await gum({ video: VIDEO_C }); } catch (e) { S.status = 'Fikk ikke slått på kameraet (' + e.name + ').'; renderCtl(); return; }
+    try { st = await gum({ video: VIDEO_C }); } catch (e) { S.status = "Couldn't turn on the camera (" + e.name + ').'; renderCtl(); return; }
     const t = st.getVideoTracks()[0]; S.local.addTrack(t); S.hasV = true; S.camOn = true; S.status = '';
     for (const r of [...S.remotes.values()]) {
       const tr = transceivers(r, 'video').find(x => /send/.test(x.currentDirection || x.direction || ''));
@@ -204,11 +204,11 @@ function tapForSound() {
 }
 
 // ---------- Fliser ----------
-function memberFor(id) { return id === 'me' ? S.members.find(m => m.peerId === S.myId) || { slot: S.mySlot, name: 'Deg' } : S.members.find(m => m.peerId === id); }
+function memberFor(id) { return id === 'me' ? S.members.find(m => m.peerId === S.myId) || { slot: S.mySlot, name: 'You' } : S.members.find(m => m.peerId === id); }
 function makeTile(id) {
   const el = document.createElement('div'); el.className = 'vt';
   el.innerHTML = '<video playsinline autoplay></video><div class="vt-av"></div><div class="vt-st"></div>' +
-    '<div class="vt-nm"><i></i><span></span></div><div class="vt-mic" title="Mikrofonen er av">🔇</div><div class="vt-lvl"><b></b></div>';
+    '<div class="vt-nm"><i></i><span></span></div><div class="vt-mic" title="Mic is off">🔇</div><div class="vt-lvl"><b></b></div>';
   const video = el.querySelector('video');
   video.setAttribute('playsinline', ''); video.setAttribute('webkit-playsinline', '');
   if (id === 'me') { video.muted = true; el.classList.add('me'); }
@@ -264,16 +264,16 @@ function updateTile(id) {
   const m = memberFor(id), slot = m ? m.slot : 0;
   t.el.style.setProperty('--c', COLORS[slot] || '#888');
   if (t.slot !== slot && S.icon) { const a = t.el.querySelector('.vt-av'); a.innerHTML = ''; a.appendChild(S.icon(slot)); t.slot = slot; }
-  t.el.querySelector('.vt-nm span').textContent = (m ? m.name : 'Spiller') + (id === 'me' ? ' (deg)' : '');
+  t.el.querySelector('.vt-nm span').textContent = (m ? m.name : 'Player') + (id === 'me' ? ' (you)' : '');
   let cam, mic, st = '';
-  if (id === 'me') { const s = state(); cam = s.cam; mic = s.mic; if (!S.local) st = 'Starter …'; }
+  if (id === 'me') { const s = state(); cam = s.cam; mic = s.mic; if (!S.local) st = 'Starting …'; }
   else {
     const av = (m && m.av) || { mic: true, cam: true }, r = S.remotes.get(id);
     const vt = t.stream && t.stream.getVideoTracks().find(x => x.readyState === 'live');
     cam = !!(av.cam && vt); mic = !!av.mic;
-    if (!r) st = 'Kobler til …';
-    else if (!r.connected) st = 'Kobler til …';
-    else if (!av.cam && !av.mic) st = 'Uten kamera';
+    if (!r) st = 'Connecting …';
+    else if (!r.connected) st = 'Connecting …';
+    else if (!av.cam && !av.mic) st = 'No camera';
   }
   t.el.classList.toggle('cam', !!cam && !S.hidden);
   t.el.classList.toggle('mute', !mic);
@@ -289,7 +289,7 @@ function addMeter(id, st) {
     const an = S.actx.createAnalyser(); an.fftSize = 512; an.smoothingTimeConstant = 0.3;
     src.connect(an);
     S.meters.set(id, { src, an, buf: new Uint8Array(an.fftSize), lvl: 0, track: tr });
-  } catch (e) { log('måler feilet', e); }
+  } catch (e) { log('meter failed', e); }
 }
 function dropMeter(id) { const m = S.meters.get(id); if (!m) return; try { m.src.disconnect(); } catch (e) { } S.meters.delete(id); }
 function tick() {
@@ -318,10 +318,10 @@ function renderCtl() {
   bar.classList.toggle('hid', S.hidden);
   const mic = $('avMic'), cam = $('avCam'), hide = $('avHide');
   mic.disabled = !S.hasA; cam.disabled = !S.local || (!S.hasV && !S.camOn && !navigator.mediaDevices);
-  mic.classList.toggle('off', !(S.hasA && S.micOn)); mic.innerHTML = (S.hasA && S.micOn) ? '🎤 <span>Mikrofon på</span>' : '🔇 <span>Mikrofon av</span>';
+  mic.classList.toggle('off', !(S.hasA && S.micOn)); mic.innerHTML = (S.hasA && S.micOn) ? '🎤 <span>Mic on</span>' : '🔇 <span>Mic off</span>';
   const camOn = S.hasV && S.camOn;
-  cam.classList.toggle('off', !camOn); cam.innerHTML = camOn ? '📷 <span>Kamera på</span>' : '🚫 <span>Kamera av</span>';
-  hide.classList.toggle('off', S.hidden); hide.innerHTML = S.hidden ? '👁 <span>Vis video</span>' : '🙈 <span>Skjul video</span>';
+  cam.classList.toggle('off', !camOn); cam.innerHTML = camOn ? '📷 <span>Camera on</span>' : '🚫 <span>Camera off</span>';
+  hide.classList.toggle('off', S.hidden); hide.innerHTML = S.hidden ? '👁 <span>Show video</span>' : '🙈 <span>Hide video</span>';
   $('avTap').style.display = S.needTap ? '' : 'none';
   $('avStatus').textContent = S.status || '';
 }

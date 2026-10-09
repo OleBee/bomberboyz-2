@@ -1,39 +1,40 @@
 # Super BomberBoyz
 
-Retro bombespill i nettleseren for 1–8 spillere. Spill online med venner uten egen server (WebRTC via PeerJS), eller alene mot boter.
+Retro bomb battles in your browser for 1–8 players. Play online with friends without a server of your own (WebRTC via PeerJS), or solo against bots.
 
-**Spill her:** https://bomberboyz.no/
-**Med video- og lydchat (maks 4):** https://bomberboyz.no/videochat/
+**Play here:** https://bomberboyz.no/
+**With video and voice chat (max 4):** https://bomberboyz.no/videochat/
 
-- **Lag rom** gir en romkode og en lenke du kan dele. Venner åpner lenken og trykker **Bli med**.
-- Verten kan fylle tomme plasser med boter og trykker **Start**.
-- Styring: piltaster eller WASD, mellomrom = bombe. På mobil vises knapper under brettet.
-- Opptil 8 spillere. Forsiden bruker alltid stort brett (27×23); /videochat/ bruker vanlig brett (13×11). «Beste spillere» viser bare den felles lista for alle spillere (egen statistikk lagres lokalt, men vises ikke). På PC/laptop vises alltid hele brettet, skalert til vinduet og spillerlista står i en kolonne til venstre. Spillet går i fullskjerm når du starter (Lag rom, Bli med, Spill mot boter, Start); Esc gjelder resten av spillet, F slår fullskjerm av/på, M slår lyden av/på (ingen lydknapp – lyd er på som standard). «Avslutt» står øverst til høyre og spør før du går ut. Spillet er alltid liggende og har samme oppsett på alle skjermer (hele brettet, ingen følgekamera): på iPad/iPhone står styrekorset nederst i spillerkolonnen til venstre og bombeknappen til høyre; holder du enheten stående, vises «Snu enheten». Manifestet ber om liggende/fullskjerm når spillet legges på hjemskjermen.
-- Hver runde varer 3:00 (nedtelling i HUD-en). Ved 2:30 kommer **HURRY UP!**: faste blokker faller i spiral fra nederste venstre hjørne, med klokka langs ytterkanten og så neste ring innover (vanlig brett to ringer, stort brett tre). Står du der en blokk lander, er du ute (ingen får drapspoeng). Bomber, power-ups og murvegger under blokka forsvinner.
-- Uavgjort hvis tiden går ut før én står igjen, eller hvis alle de siste dør samtidig – da får ingen seier, men runden telles som spilt.
-- Power-ups: 💣 flere bomber, 🔥 lengre flamme, ⚡ fart, 🥊 Boksehanske: dytt bomber (gå inn i en bombe, så glir den til den treffer noe).
-- Navnefeltet er tomt med «Spiller» som hint. Skriver du ingenting, heter du «Spiller».
+- **Create room** gives you a room code and a link to share. Friends open the link and hit **Join**.
+- The host can fill empty slots with bots and presses **Start**.
+- Controls: arrow keys or WASD, Space = bomb, M = sound on/off. On tablet and phone (landscape): d-pad on the left, bomb button on the right.
+- Up to 8 players. The front page always uses the big board (27×23); /videochat/ uses the classic board (13×11). **Top Players** shows the shared all-players list only (your own stats are still stored locally but not shown).
+- The whole board is always visible, scaled to the window, with the player list in a column to the left (one row per board tile row). The game goes fullscreen when you start (Create room, Join, Play vs bots, Start); Esc is respected for the rest of that game, F toggles fullscreen. Sound is on by default (no sound button). **Quit** sits to the right of the board and asks before leaving.
+- Always landscape, same layout on every screen (whole board, no follow camera). Hold a phone or tablet upright and you'll see **Rotate your device**. The manifest asks for landscape/fullscreen when added to the home screen.
+- Each round lasts 3:00. The red countdown shows above the board for the last 30 s. At 2:30 it's **HURRY UP!**: solid blocks drop in a spiral from the bottom-left corner, clockwise along the outer edge and then the next ring inwards (classic board two rings, big board three). Get hit by a block and you're out (nobody gets the kill). Bombs, power-ups and brick walls under the block disappear.
+- It's a draw if time runs out before only one player is left, or if the last players die at the same time – no win, but the round counts as played.
+- Power-ups: 💣 more bombs, 🔥 longer flames, ⚡ speed, 🥊 Boxing glove: punch bombs away (walk into a bomb and it slides until it hits something).
+- The name field is empty with "Player" as a hint. Leave it empty and you're "Player".
 
-## Videochat (/videochat/)
-- Kamera og mikrofon mellom alle i rommet (full mesh av PeerJS MediaConnections, maks 4), logikken ligger i `videochat/video.js`. Videochat-versjonen har vanlig brett og maks 4 spillere.
-- 320×240 @ 15 fps, ekkokansellering og støydemping, maks ca. 250 kbit/s video per mottaker.
-- Nekter du kamera/mikrofon, kan du fortsatt spille og se/høre de andre.
+## Video chat (/videochat/)
+- Camera and mic between everyone in the room (full mesh of PeerJS MediaConnections, max 4); the logic lives in `videochat/video.js`. The video chat version uses the classic board and max 4 players.
+- 320×240 @ 15 fps, echo cancellation and noise suppression, max about 250 kbit/s video per receiver.
+- Say no to camera/mic and you can still play and see/hear the others.
 
-## Musikk og lyd
-- All musikk og alle lydeffekter er egne komposisjoner, laget med Web Audio mens spillet kjører (`bbx.js`). Ingen lydfiler, ingen lånte melodier.
-- Kampmusikk, menymusikk, seiers- og uavgjort-jingle, og effekter for bombe, eksplosjon, vegg, power-up, spark, død og nedtelling.
-- Lyden starter først når du trykker eller klikker. **M** slår lyd av/på, høyttalerknappen øverst til høyre bytter mellom 25 %, 50 %, 85 % og av. Valget huskes.
+## Music and sound
+- All music and sound effects are original, generated with Web Audio while the game runs (`bbx.js`). No audio files, no borrowed tunes.
+- Battle music, menu music, win and draw jingles, and effects for bombs, explosions, walls, power-ups, kicks, deaths and the countdown.
+- Sound starts on your first tap or click. **M** toggles sound; the choice is remembered.
 
-## Toppliste
-- **Beste i rommet:** verten teller seire, runder og drap per navn så lenge rommet lever. Vises mellom rundene og i lobbyen.
-- **Beste spillere (denne enheten):** lagres i nettleseren (localStorage), topp 10 vises på startsiden. Boter telles ikke.
-- **Felles liste (alle enheter):** av til `bbx-config.js` fylles ut. Se `backend/README.md`.
+## Leaderboards
+- **Best in room:** the host counts wins, rounds and kills per name while the room lives. Shown between rounds and in the lobby.
+- **Top Players (all players):** the shared list, turned on in `bbx-config.js`. See `backend/README.md`. The server's messages are in Norwegian and are mapped to English in the browser.
 
-## Struktur
-- `/` – hovedversjonen uten video: 8 spillere, stort brett (PeerJS-prefiks `bomberboyz2-v1-`).
-- `/videochat/` – versjonen med video- og lydchat (PeerJS-prefiks `bomberboyz2-video-v1-`). Egne rom, kolliderer ikke.
-- `bbx.js` – musikk, lyd og toppliste (felles for begge), `bbx-config.js` – innstillinger for felles toppliste, `backend/` – server for felles toppliste.
-- Gamle adresser videresender med romkode (`?rom=`) og hash: `/legacy/` → `/`, `/video/` → `/videochat/`.
-- Navn, lokal toppliste og lydvalg lagres i nettleseren og deles av begge versjonene.
+## Structure
+- `/` – main version without video: 8 players, big board (PeerJS prefix `bomberboyz2-v1-`).
+- `/videochat/` – version with video and voice chat (PeerJS prefix `bomberboyz2-video-v1-`). Separate rooms, no collisions.
+- `bbx.js` – music, sound and leaderboard (shared by both), `bbx-config.js` – settings for the shared leaderboard, `backend/` – server for the shared leaderboard.
+- Old addresses redirect with room code (`?rom=`) and hash: `/legacy/` → `/`, `/video/` → `/videochat/`.
+- Name, local stats and sound choice are stored in the browser and shared by both versions.
 
-All grafikk er original og tegnes i kode (`game.js`). PeerJS (MIT) ligger i `peerjs.min.js`.
+All graphics are original and drawn in code (`game.js`). PeerJS (MIT) is in `peerjs.min.js`.

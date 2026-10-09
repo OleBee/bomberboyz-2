@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="no">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Super BomberBoyz med videochat</title>
-<meta name="description" content="Super BomberBoyz: retro bombespill i nettleseren for opptil fire spillere online. Ingen installasjon.">
+<title>Super BomberBoyz with video chat</title>
+<meta name="description" content="Super BomberBoyz: retro bomb battles in your browser for up to four players online. No install needed.">
 <meta name="application-name" content="Super BomberBoyz">
 <meta name="apple-mobile-web-app-title" content="Super BomberBoyz">
-<meta property="og:title" content="Super BomberBoyz med videochat">
-<meta property="og:description" content="Retro bombespill i nettleseren for opptil fire spillere online. Ingen installasjon.">
+<meta property="og:title" content="Super BomberBoyz with video chat">
+<meta property="og:description" content="Retro bomb battles in your browser for up to four players online. No install needed.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://bomberboyz.no/videochat/">
 <link rel="canonical" href="https://bomberboyz.no/videochat/">
@@ -311,53 +311,53 @@
 </style>
 </head>
 <body data-screen="menu">
-<div id="rotate" role="alert"><span>📱</span>Snu enheten<small>Super BomberBoyz spilles liggende</small></div>
+<div id="rotate" role="alert"><span>📱</span>Rotate your device<small>Super BomberBoyz is played in landscape</small></div>
 
 <!-- MENY: logo øverst, så Beste spillere (venstre, 1/3) og menyen (høyre, 2/3) side om side -->
 <section id="menu" class="screen on">
  <div class="mframe">
   <h1><span class="super">SUPER</span>BOMBERBOYZ</h1>
-  <div class="sub">Retro bombespill for 1–4 spillere – rett i nettleseren</div>
+  <div class="sub">Retro bomb battles for 1–4 players – right in your browser</div>
 
   <div class="mcols">
    <div id="lbSlot">
       <div class="bbx-board" id="lbPanel">
-        <h2>🏆 BESTE SPILLERE</h2>
+        <h2>🏆 TOP PLAYERS</h2>
         <div id="lbList"></div>
-        <div class="hint">Seire, runder og drap per navn. Boter telles ikke.</div>
+        <div class="hint">Wins, rounds and kills per name. Bots don't count.</div>
       </div>
    </div>
 
    <div class="bbx-board mmain">
     <div class="panel mname">
-     <label for="name">Ditt navn</label>
-     <input id="name" type="text" maxlength="12" placeholder="Spiller" autocomplete="off">
+     <label for="name">Your name</label>
+     <input id="name" type="text" maxlength="12" placeholder="Player" autocomplete="off">
     </div>
 
     <div class="panel mbox">
      <div class="invite" id="invitePanel" style="display:none">
-      <h2>Du er invitert!</h2>
-      <div>Rom <b id="inviteCode"></b> venter på deg.</div>
-      <div style="margin-top:12px"><button class="big" id="btnJoinInvite">Bli med</button></div>
+      <h2>You're invited!</h2>
+      <div>Room <b id="inviteCode"></b> is waiting for you.</div>
+      <div style="margin-top:12px"><button class="big" id="btnJoinInvite">Join</button></div>
      </div>
 
-     <h2>Spill med venner</h2>
-     <button class="big" id="btnCreate">Lag rom</button>
-     <div class="hint">Du får en romkode og en lenke du kan dele. Opptil tre venner kan bli med. Nettleseren spør om kamera og mikrofon – sier du nei, kan du likevel spille.</div>
-     <label for="joinCode" class="mgap">Har du en kode eller lenke?</label>
+     <h2>Play with friends</h2>
+     <button class="big" id="btnCreate">Create room</button>
+     <div class="hint">You'll get a room code and a link to share. Up to three friends can join. Your browser will ask for camera and mic – say no and you can still play.</div>
+     <label for="joinCode" class="mgap">Got a code or link?</label>
      <div class="row">
-      <input id="joinCode" type="text" placeholder="F.eks. K7QXM" autocomplete="off" style="flex: 3 1 160px; text-transform: uppercase">
-      <button class="alt" id="btnJoin" style="flex: 1 1 100px">Bli med</button>
+      <input id="joinCode" type="text" placeholder="e.g. K7QXM" autocomplete="off" style="flex: 3 1 160px; text-transform: uppercase">
+      <button class="alt" id="btnJoin" style="flex: 1 1 100px">Join</button>
      </div>
      <div class="err" id="menuErr"></div>
 
      <div class="msep"></div>
-     <h2>Spill alene</h2>
-     <button class="big grey" id="btnSolo">Spill mot boter</button>
+     <h2>Play solo</h2>
+     <button class="big grey" id="btnSolo">Play vs bots</button>
     </div>
    </div>
   </div>
-  <footer>Styring: piltaster eller WASD, mellomrom = bombe, M = lyd av/på. På nettbrett og mobil (liggende): styrekors til venstre, bombe til høyre.<br>Power-ups: 💣 flere bomber · 🔥 lengre flamme · ⚡ fart · 🥊 Boksehanske: dytt bomber</footer>
+  <footer>Controls: arrow keys or WASD, Space = bomb, M = sound on/off. On tablet and phone (landscape): d-pad on the left, bomb on the right.<br>Power-ups: 💣 more bombs · 🔥 longer flames · ⚡ speed · 🥊 Boxing glove: punch bombs away</footer>
  </div>
 </section>
 
@@ -369,26 +369,26 @@
    <div id="lbSlotLobby"></div>
    <div class="lmain">
    <div class="panel">
-     <h2 id="lobbyTitle">Rom</h2>
+     <h2 id="lobbyTitle">Room</h2>
      <div class="code" id="lobbyCode">-----</div>
      <div class="row" id="shareRow">
        <input id="shareLink" type="text" readonly>
-       <button class="alt" id="btnCopy" style="flex:0 0 auto">Kopier lenke</button>
-       <button class="alt" id="btnShare" style="flex:0 0 auto; display:none">Del</button>
+       <button class="alt" id="btnCopy" style="flex:0 0 auto">Copy link</button>
+       <button class="alt" id="btnShare" style="flex:0 0 auto; display:none">Share</button>
      </div>
      <div class="slots" id="slots"></div>
      <div id="roomBoard"></div>
      <div id="avLobby"></div>
      <div id="hostCtl" class="row">
-       <button class="grey" id="btnAddBot">+ Legg til bot</button>
-       <button class="grey" id="btnDelBot">– Fjern bot</button>
+       <button class="grey" id="btnAddBot">+ Add bot</button>
+       <button class="grey" id="btnDelBot">– Remove bot</button>
      </div>
      <div style="height:12px"></div>
      <button class="big" id="btnStart">Start</button>
-     <div id="waitTxt" class="hint" style="font-size:16px; text-align:center; display:none">Venter på at verten trykker Start …</div>
+     <div id="waitTxt" class="hint" style="font-size:16px; text-align:center; display:none">Waiting for the host to press Start …</div>
      <div class="err" id="lobbyErr"></div>
      <div style="height:8px"></div>
-     <button class="red" id="btnLeaveLobby">Forlat rommet</button>
+     <button class="red" id="btnLeaveLobby">Leave room</button>
    </div>
    </div>
   </div>
@@ -398,7 +398,7 @@
 <!-- SPILL -->
 <section id="game" class="screen">
   <div id="playarea">
-  <div id="hudrow"><div style="display:none"><div id="timer" title="Tid igjen av runden"></div></div><div id="hud"></div></div>
+  <div id="hudrow"><div style="display:none"><div id="timer" title="Time left in the round"></div></div><div id="hud"></div></div>
   <div id="stage">
   <div id="wrap">
     <canvas id="cv" width="240" height="208"></canvas>
@@ -407,11 +407,11 @@
         <div id="wintxt"></div>
         <table id="score"></table>
         <div id="overHost">
-          <button class="big" id="btnAgain">Ny runde</button>
+          <button class="big" id="btnAgain">Next round</button>
           <div style="height:10px"></div>
-          <button class="grey" id="btnToLobby">Til lobbyen</button>
+          <button class="grey" id="btnToLobby">Back to lobby</button>
         </div>
-        <div id="overWait" class="hint" style="font-size:16px">Venter på at verten starter ny runde …</div>
+        <div id="overWait" class="hint" style="font-size:16px">Waiting for the host to start the next round …</div>
       </div>
     </div>
   </div>
@@ -426,22 +426,22 @@
       <button class="r" data-dir="right">▶</button>
       <button class="d" data-dir="down">▼</button>
     </div>
-    <button id="tbomb">BOMBE</button>
+    <button id="tbomb">BOMB</button>
   </div>
   <div id="gamebar">
-    <span class="keys">Piltaster/WASD flytter · Mellomrom legger bombe</span>
+    <span class="keys">Arrows/WASD to move · Space drops a bomb</span>
     <span id="netInfo"></span>
-    <span class="gbtns"><button class="grey" id="btnFull" title="Fullskjerm (F)">⛶ Fullskjerm</button><button class="red" id="btnQuit">Avslutt</button></span>
+    <span class="gbtns"><button class="grey" id="btnFull" title="Fullscreen (F)">⛶ Fullscreen</button><button class="red" id="btnQuit">Quit</button></span>
   </div>
 </section>
 
 <!-- Video/lyd: flyttes mellom lobbyen og spillet -->
 <div id="avbar">
   <div id="avctl">
-    <button id="avMic" type="button">🎤 <span>Mikrofon</span></button>
-    <button id="avCam" type="button">📷 <span>Kamera</span></button>
-    <button id="avHide" type="button">🙈 <span>Skjul video</span></button>
-    <button id="avTap" type="button" style="display:none">🔊 Trykk for å høre de andre</button>
+    <button id="avMic" type="button">🎤 <span>Mic</span></button>
+    <button id="avCam" type="button">📷 <span>Camera</span></button>
+    <button id="avHide" type="button">🙈 <span>Hide video</span></button>
+    <button id="avTap" type="button" style="display:none">🔊 Tap to hear the others</button>
   </div>
   <div id="avStatus"></div>
   <div id="vtiles"></div>
