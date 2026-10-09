@@ -3,6 +3,7 @@
 (() => {
 // ---------- Konstanter ----------
 const COLS = 13, ROWS = 11, TS = 16, FW = COLS + 2, FH = ROWS + 2, N = COLS * ROWS;
+const KICK_SPEED = 7;   // boksehanske: hvor mange ruter i sekundet en dyttet bombe glir
 const BOMB_TIME = 2.5, FLAME_TIME = 0.6, BURN_TIME = 0.6, READY_TIME = 1.4, ROUND_LIMIT = 160;
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const DIRKEY = { u: 'up', d: 'down', l: 'left', r: 'right' };
@@ -89,8 +90,11 @@ function buildTiles() {
     S: { bg: '#2a8a6a', rows: [
       '.....YYY..', '....YYY...', '...YYY....', '..YYYYYY..', '....YYY...',
       '...YYY....', '..YYY.....', '.YYY......', '.YY.......', '.Y........'] },
+    G: { bg: '#6a3cb0', rows: [
+      '....RRRR..', '...RWWRRR.', '..RWRRRRRR', 'W.RRRRRRRR', 'WWRRDDDDRR',
+      'WWRRRRRRDR', 'W.RRRRRRDR', '..RRRRRRR.', '...DRRRRD.', '....DDDD..'] },
   };
-  const ipal = { K: '#141418', W: '#9aa0c0', Y: '#ffe04a', O: '#ff8a1a', R: '#e03a1a' };
+  const ipal = { D: '#8e1a10', K: '#141418', W: '#9aa0c0', Y: '#ffe04a', O: '#ff8a1a', R: '#e03a1a' };
   for (const k in icons) {
     c = mk(TS, TS); x = c.getContext('2d');
     x.fillStyle = '#f0f0f0'; x.fillRect(0, 0, 16, 16);
@@ -158,9 +162,9 @@ class Game {
     }
     this.players = members.map(m => ({
       slot: m.slot, name: m.name, bot: !!m.bot, x: STARTS[m.slot][0], y: STARTS[m.slot][1],
-      alive: true, deathT: 0, maxBombs: 1, range: 2, speedLv: 0, dir: 'down', moving: false,
+      alive: true, deathT: 0, maxBombs: 1, range: 2, speedLv: 0, glove: false, dir: 'down', moving: false,
       input: { dir: null, bomb: false }, ai: { cd: 0.5 + Math.random() * 0.5, jit: {}, jitT: 0, step: null, from: null } }));
-    this.bombs = []; this.flames = new Map(); this.burning = new Map();
+    this.bombs = []; this.bombId = 0; this.flames = new Map(); this.burning = new Map();
     this.phase = 'play'; this.endT = 0; this.winner = -1; this.time = 0; this.exCount = 0; this.sdIdx = 0;
   }
   cell(x, y) { return (x < 0 || y < 0 || x >= COLS || y >= ROWS) ? '#' : this.grid[y * COLS + x]; }
@@ -184,6 +188,7 @@ class Game {
       if (c === 'B') { p.maxBombs = Math.min(8, p.maxBombs + 1); this.grid[i] = '.'; }
       else if (c === 'F') { p.range = Math.min(8, p.range + 1); this.grid[i] = '.'; }
       else if (c === 'S') { p.speedLv = Math.min(5, p.speedLv + 1); this.grid[i] = '.'; }
+      else if (c === 'G') { p.glove = true; this.grid[i] = '.'; }
     }
     for (const b of this.bombs) {
       for (const s of b.pass) {
@@ -192,6 +197,7 @@ class Game {
       }
       b.t -= dt;
     }
+    this.slideBombs(dt);
     this.explode();
     for (const [i, f] of this.flames) { f.t -= dt; if (f.t <= 0) this.flames.delete(i); }
     for (const [i, w] of this.burning) {
@@ -219,12 +225,37 @@ class Game {
       }
     }
   }
+  // Boksehanske: en dyttet bombe glir rute for rute til den møter vegg, blokk, bombe, spiller eller power-up
+  slideFree(b, x, y) {
+    if (this.cell(x, y) !== '.') return false;
+    if (this.bombs.some(o => o !== b && o.x === x && o.y === y)) return false;
+    return !this.players.some(q => q.alive && Math.abs(q.x - x) < 0.8 && Math.abs(q.y - y) < 0.8);
+  }
+  kick(p, b) {
+    if (b.slide || !p.glove || b.pass.has(p.slot)) return;
+    const [dx, dy] = DIRS[p.dir];
+    if (!this.slideFree(b, b.x + dx, b.y + dy)) return;
+    b.slide = p.dir; b.prog = 0;
+  }
+  slideBombs(dt) {
+    for (const b of this.bombs) {
+      if (!b.slide) continue;
+      const [dx, dy] = DIRS[b.slide];
+      // prog er forskyvning fra rutemidten (−0,5 … 0,5); bomben bytter rute halvveis
+      if (b.prog >= 0 && !this.slideFree(b, b.x + dx, b.y + dy)) { b.prog = 0; b.slide = null; continue; }
+      b.prog += KICK_SPEED * dt;
+      if (b.prog >= 0.5) {
+        b.x += dx; b.y += dy; b.prog -= 1;
+        for (const s of [...b.pass]) b.pass.delete(s);
+      }
+    }
+  }
   placeBomb(p) {
     const tx = Math.round(p.x), ty = Math.round(p.y);
     if (this.bombAt(tx, ty)) return;
     if (this.bombs.filter(b => b.owner === p.slot).length >= p.maxBombs) return;
     const pass = new Set(this.players.filter(q => q.alive && Math.abs(q.x - tx) < 1 && Math.abs(q.y - ty) < 1).map(q => q.slot));
-    this.bombs.push({ x: tx, y: ty, t: BOMB_TIME, range: p.range, owner: p.slot, pass });
+    this.bombs.push({ id: ++this.bombId, x: tx, y: ty, t: BOMB_TIME, range: p.range, owner: p.slot, pass, slide: null, prog: 0 });
   }
   addFlame(x, y, k) {
     const i = y * COLS + x, e = this.flames.get(i);
@@ -247,12 +278,12 @@ class Game {
           if (c === 'w') {
             const r = Math.random();
             this.grid[i] = 'x';
-            this.burning.set(i, { t: BURN_TIME, drop: r < 0.12 ? 'B' : r < 0.24 ? 'F' : r < 0.32 ? 'S' : null });
+            this.burning.set(i, { t: BURN_TIME, drop: r < 0.12 ? 'B' : r < 0.24 ? 'F' : r < 0.32 ? 'S' : r < 0.39 ? 'G' : null });
             break;
           }
           const ob = this.bombAt(x, y);
           if (ob) { q.push(ob); break; }
-          if (c === 'B' || c === 'F' || c === 'S') { this.grid[i] = '.'; this.addFlame(x, y, end); break; }
+          if (c === 'B' || c === 'F' || c === 'S' || c === 'G') { this.grid[i] = '.'; this.addFlame(x, y, end); break; }
           this.addFlame(x, y, s === b.range ? end : ax);
         }
       }
@@ -283,6 +314,14 @@ function movePlayer(g, p, dt) {
   let na = a + s * dist;
   if (!pass(ca + s, Math.round(o))) na = s > 0 ? Math.min(na, Math.max(a, ca)) : Math.max(na, Math.min(a, ca));
   a = na; put();
+  // Boksehanske: går du rett inn i en bombe, dyttes den videre i gåretningen
+  if (p.glove) {
+    const ra = Math.round(a), ro = Math.round(o);
+    if (Math.abs(o - ro) < 0.2 && Math.abs(a - ra) < 0.05) {
+      const b = horiz ? g.bombAt(ra + s, ro) : g.bombAt(ro, ra + s);
+      if (b) g.kick(p, b);
+    }
+  }
 }
 
 // ---------- Boter ----------
@@ -293,7 +332,7 @@ function blast(g, b) {
       const x = b.x + dx * s, y = b.y + dy * s, c = g.cell(x, y);
       if (c === '#' || c === 'w' || c === 'x') break;
       out.push(y * COLS + x);
-      if (g.bombAt(x, y) || 'BFS'.includes(c)) break;
+      if (g.bombAt(x, y) || 'BFSG'.includes(c)) break;
     }
   }
   return out;
@@ -369,7 +408,7 @@ function botDecide(g, p, tx, ty) {
         if (danger[i] !== Infinity) continue;
         const x = i % COLS, y = (i / COLS) | 0, c = g.grid[i];
         let sc = -r.dist[i] * 0.9;
-        if (c === 'B' || c === 'F' || c === 'S') sc += 9;
+        if (c === 'B' || c === 'F' || c === 'S' || c === 'G') sc += 9;
         let walls = 0;
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (g.cell(x + dx, y + dy) === 'w') walls++;
         sc += walls * 2.2;
@@ -425,11 +464,12 @@ function botThink(g, p, dt) {
 function snapshot(g) {
   return {
     t: 's', ph: g.phase, g: g.grid.join(''), tm: +g.time.toFixed(2), ex: g.exCount, w: g.winner,
-    b: g.bombs.map(b => [b.x, b.y, +b.t.toFixed(2)]),
+    b: g.bombs.map(b => { const d = b.slide ? DIRS[b.slide] : [0, 0];
+      return [b.x, b.y, +b.t.toFixed(2), +(d[0] * b.prog).toFixed(3), +(d[1] * b.prog).toFixed(3), b.id]; }),
     f: [...g.flames].map(([i, f]) => [i, f.k, +f.t.toFixed(2)]),
     x: [...g.burning].map(([i, w]) => [i, +w.t.toFixed(2)]),
     p: g.players.map(p => [p.slot, +p.x.toFixed(3), +p.y.toFixed(3), p.alive ? 1 : 0, p.dir[0],
-      p.moving ? 1 : 0, +p.deathT.toFixed(2), p.maxBombs, p.range, p.speedLv, p.name, p.bot ? 1 : 0]),
+      p.moving ? 1 : 0, +p.deathT.toFixed(2), p.maxBombs, p.range, p.speedLv, p.name, p.bot ? 1 : 0, p.glove ? 1 : 0]),
     sc: room.scores.slice(),
   };
 }
@@ -438,6 +478,7 @@ function snapshot(g) {
 const cv = $('cv'), ctx = cv.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 const disp = {}; // glattede posisjoner per spiller
+const dispB = {}; // glattede posisjoner per bombe
 function circle(c, cx, cy, r, col) {
   c.fillStyle = col;
   for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) {
@@ -513,9 +554,21 @@ function render(s, now, dt) {
         ctx.fillRect(px + a, py + b, 2, 2);
       }
       ctx.fillStyle = 'rgba(255,200,60,' + (0.5 * life).toFixed(2) + ')'; ctx.fillRect(px + 2, py + 2, 12, 12);
-    } else if (c === 'B' || c === 'F' || c === 'S') ctx.drawImage(SPR['p' + c], px, py);
+    } else if (c === 'B' || c === 'F' || c === 'S' || c === 'G') ctx.drawImage(SPR['p' + c], px, py);
   }
-  for (const [bx, by, t] of s.b) drawBomb((bx + 1) * TS, (by + 1) * TS, t, now);
+  const seen = new Set();
+  for (const [bx, by, t, ox = 0, oy = 0, id] of s.b) {
+    let x = bx + ox, y = by + oy;
+    if (id != null) {   // glatt glidning hos klienter (snapshot kommer 20 ganger i sekundet)
+      seen.add(id);
+      let d = dispB[id];
+      if (!d || Math.abs(d.x - x) > 2 || Math.abs(d.y - y) > 2) d = dispB[id] = { x, y };
+      const k = net.role === 'client' ? Math.min(1, dt * 18) : 1;
+      d.x += (x - d.x) * k; d.y += (y - d.y) * k; x = d.x; y = d.y;
+    }
+    drawBomb(Math.round((x + 1) * TS), Math.round((y + 1) * TS), t, now);
+  }
+  for (const id in dispB) if (!seen.has(+id)) delete dispB[id];
   for (const [i, k, t] of s.f) drawFlame((i % COLS + 1) * TS, (((i / COLS) | 0) + 1) * TS, k, t, now);
   const ps = s.p.slice().sort((a, b) => (disp[a[0]] ? disp[a[0]].y : a[2]) - (disp[b[0]] ? disp[b[0]].y : b[2]));
   for (const p of ps) {
@@ -805,12 +858,12 @@ function renderLobby() {
 }
 let hudKey = '', overKey = '';
 function updateHud(s) {
-  const key = JSON.stringify(s.p.map(p => [p[0], p[3], p[7], p[8], p[9], p[10]]));
+  const key = JSON.stringify(s.p.map(p => [p[0], p[3], p[7], p[8], p[9], p[10], p[12]]));
   if (key !== hudKey) {
     hudKey = key; const hud = $('hud'); hud.innerHTML = '';
     for (const p of s.p) {
       const d = document.createElement('div'); d.className = 'hp' + (p[3] ? '' : ' dead');
-      d.innerHTML = `<i style="background:${COLORS[p[0]].c}"></i><b></b><span>💣${p[7]} 🔥${p[8]} ⚡${p[9]}</span>`;
+      d.innerHTML = `<i style="background:${COLORS[p[0]].c}"></i><b></b><span>💣${p[7]} 🔥${p[8]} ⚡${p[9]}${p[12] ? ' 🥊' : ''}</span>`;
       d.querySelector('b').textContent = p[10] + (p[0] === mySlot ? ' (deg)' : '');
       hud.appendChild(d);
     }

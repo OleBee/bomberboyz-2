@@ -9,6 +9,7 @@ Retro bombespill i nettleseren for 1–4 spillere, med video- og lydchat mellom 
 - Verten kan fylle tomme plasser med boter og trykker **Start**.
 - Styring: piltaster eller WASD, mellomrom = bombe. På mobil vises knapper under brettet.
 - Etter 90 sekunder begynner brettet å krympe.
+- Power-ups: 💣 flere bomber, 🔥 lengre flamme, ⚡ fart, 🥊 Boksehanske: dytt bomber (gå inn i en bombe, så glir den til den treffer noe).
 - Navnefeltet er tomt med «Spiller» som hint. Skriver du ingenting, heter du «Spiller».
 
 ## Video og lyd
