@@ -510,6 +510,34 @@ function snapshot(g) {
 const cv = $('cv'), ctx = cv.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 const view = { x: 0, y: 0, w: cv.width, h: cv.height };   // hele brettet vises
+// Brettet skaleres til plassen ved siden av (eller under) videoflisene: størst mulige ruter, hele brettet synlig.
+const FIT = { tile: 0, key: '' };
+function fitView() {
+  const touch = document.body.classList.contains('touch'), g = $('game'), av = $('avGame'), stage = $('stage');
+  const gs = getComputedStyle(g), W = document.documentElement.clientWidth || window.innerWidth, H = window.innerHeight;
+  const padX = parseFloat(gs.paddingLeft) + parseFloat(gs.paddingRight), padY = parseFloat(gs.paddingTop) + parseFloat(gs.paddingBottom);
+  const top = $('hudrow').offsetHeight + 6, bar = $('gamebar').offsetHeight + 8, SH = 8;
+  const stacked = getComputedStyle(stage).flexDirection.startsWith('column');
+  const avW = !stacked && av.offsetWidth ? av.offsetWidth + 12 : 0, avH = stacked && av.offsetHeight ? av.offsetHeight + 6 : 0;
+  const FWc = cv.width / TS, FHc = cv.height / TS;
+  const availW = Math.max(160, W - padX - SH - avW), availH = Math.max(120, H - padY - top - bar - SH - avH - (touch ? ($('touch').offsetHeight ? $('touch').offsetHeight + 10 : 214) : 0));
+  const tile = Math.min(availW / FWc, availH / FHc);
+  const dpr = window.devicePixelRatio || 1, t = Math.max(4, Math.floor(tile)), ti = Math.floor(tile * dpr / TS) * TS / dpr;
+  const tt = ti >= TS / dpr && ti >= t * 0.9 ? ti : t;
+  FIT.tile = tt;
+  const cssW = FWc * tt, cssH = FHc * tt, key = cssW + 'x' + cssH + ':' + avW;
+  if (key !== FIT.key) { FIT.key = key; cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px'; g.style.setProperty('--bw', (cssW + avW) + 'px'); }
+}
+window.addEventListener('resize', fitView);
+if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if ($('game').classList.contains('on')) fitView(); }); ro.observe($('hudrow')); ro.observe($('gamebar')); ro.observe($('avGame')); }
+function toggleFull() {
+  const d = document, el = d.documentElement;
+  if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+  else { const r = el.requestFullscreen || el.webkitRequestFullscreen; if (r) { const p = r.call(el); if (p && p.catch) p.catch(() => {}); } }
+}
+if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) $('btnFull').style.display = 'none';
+$('btnFull').addEventListener('click', () => { toggleFull(); $('btnFull').blur(); });
+document.addEventListener('fullscreenchange', () => { $('btnFull').classList.toggle('on', !!document.fullscreenElement); fitView(); });
 const disp = {}; // hvor hver figur tegnes i dette bildet
 const dispB = {}; // hvor hver bombe tegnes
 // ---------- Klient: forutsigelse av egen figur og interpolering av de andre ----------
@@ -780,6 +808,7 @@ window.addEventListener('keydown', e => {
   if (!inGame() || e.target.tagName === 'INPUT') return;
   if (KEYMAP[e.code]) { pushDir(KEYMAP[e.code]); e.preventDefault(); }
   else if (e.code === 'Space' || e.code === 'KeyX' || e.code === 'Enter') { if (!e.repeat) bombSeq++; e.preventDefault(); }
+  else if (e.code === 'KeyF' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) { toggleFull(); e.preventDefault(); }
 });
 window.addEventListener('keyup', e => { if (KEYMAP[e.code]) popDir(KEYMAP[e.code]); });
 window.addEventListener('blur', () => { keyStack.length = 0; padPid = null; padDir = null; document.querySelectorAll('.dpad button.on').forEach(b => b.classList.remove('on')); });
@@ -823,7 +852,7 @@ const touchBox = $('touch');
 ['touchstart', 'touchmove', 'touchend', 'gesturestart', 'dblclick', 'contextmenu'].forEach(ev => touchBox.addEventListener(ev, e => { if (e.cancelable) e.preventDefault(); }, { passive: false }));
 document.addEventListener('visibilitychange', () => { if (document.hidden) { padPid = null; setPadDir(null); } });
 if (window.matchMedia && matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
-window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+window.addEventListener('touchstart', () => { document.body.classList.add('touch'); fitView(); }, { once: true, passive: true });
 
 // ---------- Rom og nettverk ----------
 const net = { role: 'none', peer: null, conns: new Map(), hostConn: null, fast: new Map(), hostFast: null };
@@ -1000,7 +1029,7 @@ function startRound() {
   for (const m of room.members) if (m.peerId) m.lastBs = m.lastBs || 0;
   room.phase = 'play'; room.round++; scored = false; localBs = bombSeq; sdSent = 0;
   for (const k in disp) delete disp[k];
-  show('game'); $('over').classList.remove('on');
+  show('game'); fitView(); $('over').classList.remove('on');
   lastSnap = snapshot(game);
   broadcast(lobbyMsg()); broadcast(lastSnap);
 }
@@ -1081,7 +1110,7 @@ function clientOnData(d) {
     applySd(d);
     lastSq = d.sq || lastSq;
     lastSnap = d; onClientSnap(d); room.scores = d.sc || room.scores; room.lb = d.lb || room.lb;
-    if (!inGame() && room.members.some(m => m.slot === mySlot)) { for (const k in disp) delete disp[k]; show('game'); }
+    if (!inGame() && room.members.some(m => m.slot === mySlot)) { for (const k in disp) delete disp[k]; show('game'); fitView(); }
   }
 }
 let cAcc = 0, inSeq = 0, sentDir = null, sentB = -1, sentT = 0;
@@ -1287,5 +1316,5 @@ function audioEvents(a, s) {
 requestAnimationFrame(frame);
 
 // Lesetilgang for testing
-window.bomberboyz = { get rules() { return { spiral: SPIRAL.slice(), sdStart: SD_START, sdStep: SD_STEP, limit: ROUND_LIMIT, ready: READY_TIME, cols: COLS, rows: ROWS }; }, get av() { return BBAV.debug; }, get snap() { return lastSnap; }, get game() { return game; }, get role() { return net.role; }, get slot() { return mySlot; }, get members() { return room.members; } };
+window.bomberboyz = { get rules() { return { spiral: SPIRAL.slice(), sdStart: SD_START, sdStep: SD_STEP, limit: ROUND_LIMIT, ready: READY_TIME, cols: COLS, rows: ROWS }; }, get av() { return BBAV.debug; }, get snap() { return lastSnap; }, get game() { return game; }, get role() { return net.role; }, get slot() { return mySlot; }, get members() { return room.members; }, get fit() { return Object.assign({}, FIT); } };
 })();

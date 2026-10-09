@@ -8,7 +8,7 @@ Retro bombespill i nettleseren for 1–8 spillere. Spill online med venner uten 
 - **Lag rom** gir en romkode og en lenke du kan dele. Venner åpner lenken og trykker **Bli med**.
 - Verten kan fylle tomme plasser med boter og trykker **Start**.
 - Styring: piltaster eller WASD, mellomrom = bombe. På mobil vises knapper under brettet.
-- Opptil 8 spillere. Stort brett (27×23, dobbelt så bredt og høyt som det vanlige) er standard; «Vanlig» (13×11) velges på startskjermen eller med «Brett»-knappen i lobbyen. På stort brett følger kameraet deg, med samme rutestørrelse som på vanlig brett.
+- Opptil 8 spillere. Stort brett (27×23, dobbelt så bredt og høyt som det vanlige) er standard; «Vanlig» (13×11) velges på startskjermen eller med «Brett»-knappen i lobbyen. På PC/laptop vises alltid hele brettet, skalert til vinduet (F eller «Fullskjerm» gir fullskjerm). På mobil følger kameraet deg på stort brett; nettbrett viser hele brettet når rutene blir minst 24 px.
 - Hver runde varer 3:00 (nedtelling i HUD-en). Ved 2:30 kommer **HURRY UP!**: faste blokker faller i spiral fra nederste venstre hjørne, med klokka langs ytterkanten og så neste ring innover (vanlig brett to ringer, stort brett tre). Står du der en blokk lander, er du ute (ingen får drapspoeng). Bomber, power-ups og murvegger under blokka forsvinner.
 - Uavgjort hvis tiden går ut før én står igjen, eller hvis alle de siste dør samtidig – da får ingen seier, men runden telles som spilt.
 - Power-ups: 💣 flere bomber, 🔥 lengre flamme, ⚡ fart, 🥊 Boksehanske: dytt bomber (gå inn i en bombe, så glir den til den treffer noe).

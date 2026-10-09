@@ -535,30 +535,60 @@ function onMapChange() {
   document.body.classList.toggle('bigmap', mapId === 'big');   // stort brett får bredere spilleflate
   view.init = false; fitView();
 }
-// Hele brettet vises hvis rutene blir store nok; ellers et utsnitt som følger deg (mobil, små skjermer)
+// Hele brettet vises alltid på PC/laptop: brettet skaleres til vinduet (størst mulige ruter som får plass i bredde og høyde).
+// Touch: hele brettet hvis rutene blir minst 24 px (nettbrett, ev. med knappene på sidene); ellers et utsnitt som følger deg (mobil).
+const FIT = { tile: 0, cam: false, side: false, key: '' };
+const TOUCH_SIDE = 215;   // plass til styrekors/bombeknapp på hver side når de ligger ved siden av brettet
 function fitView() {
   if (!FW) return;
-  const touch = document.body.classList.contains('touch');
-  const availW = Math.max(200, ($('wrap').clientWidth || window.innerWidth) - 4);
-  const hudH = $('hud').offsetHeight || 30;
-  const availH = Math.max(160, window.innerHeight - hudH - (touch ? 268 : 90));
+  const touch = document.body.classList.contains('touch'), g = $('game');
+  const gs = getComputedStyle(g), W = document.documentElement.clientWidth || window.innerWidth, H = window.innerHeight;
+  const padX = parseFloat(gs.paddingLeft) + parseFloat(gs.paddingRight), padY = parseFloat(gs.paddingTop) + parseFloat(gs.paddingBottom);
+  const top = $('hudrow').offsetHeight + 6, bar = $('gamebar').offsetHeight + 8, SH = 8;   // HUD-rad, linja under, skygge
   const ww = FW * TS, wh = FH * TS;
-  let w = ww, h = wh;
-  if (mapId === 'big') {   // samme rutestørrelse som på vanlig brett – brettet skal se større ut, ikke bare krympes
-    const tilePx = Math.max(26, Math.min(availW / (15 * TS), availH / (13 * TS)) * TS);
-    w = Math.min(ww, Math.max(11, Math.min(21, Math.floor(availW / tilePx))) * TS);
-    h = Math.min(wh, Math.max(9, Math.floor(availH / tilePx)) * TS);
-  } else if (Math.min(availW / ww, availH / wh) * TS < 26) {
-    w = Math.min(ww, Math.max(15, Math.floor(availW / 34)) * TS);
-    h = Math.min(wh, Math.max(11, Math.floor(availH / 34)) * TS);
+  const availW = Math.max(160, W - padX - SH), availH = Math.max(120, H - padY - top - bar - SH);
+  const tb = $('touch'), touchH = touch ? (tb.offsetHeight && !document.body.classList.contains('tside') ? tb.offsetHeight + 10 : 214) : 0;   // knappene under brettet
+  let tile = Math.min(availW / FW, (availH - touchH) / FH), side = false;
+  if (touch) { const ts = Math.min((availW - 2 * TOUCH_SIDE) / FW, availH / FH); if (ts > tile) { tile = ts; side = true; } }
+  const cam = touch && tile < 24;
+  let w = ww, h = wh, cssW, cssH;
+  if (!cam) {   // hele brettet; heltallig pikselskalering når det koster under 10 % størrelse
+    const dpr = window.devicePixelRatio || 1, t = Math.max(4, Math.floor(tile)), ti = Math.floor(tile * dpr / TS) * TS / dpr;
+    const tt = ti >= TS / dpr && ti >= t * 0.9 ? ti : t;
+    cssW = FW * tt; cssH = FH * tt; FIT.tile = tt;
+  } else {   // mobil: utsnitt med vanlig rutestørrelse som følger deg
+    side = false;
+    const aH = Math.max(160, availH - touchH);
+    if (mapId === 'big') {
+      const tilePx = Math.max(26, Math.min(availW / (15 * TS), aH / (13 * TS)) * TS);
+      w = Math.min(ww, Math.max(11, Math.min(21, Math.floor(availW / tilePx))) * TS);
+      h = Math.min(wh, Math.max(9, Math.floor(aH / tilePx)) * TS);
+    } else {
+      w = Math.min(ww, Math.max(15, Math.floor(availW / 34)) * TS);
+      h = Math.min(wh, Math.max(11, Math.floor(aH / 34)) * TS);
+    }
+    const sc = Math.min(availW / w, aH / h);
+    cssW = Math.floor(w * sc); cssH = Math.floor(h * sc); FIT.tile = +(sc * TS).toFixed(1);
   }
+  FIT.cam = cam; FIT.side = side;
+  document.body.classList.toggle('tside', touch && side);
   if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
   vctx.imageSmoothingEnabled = false;
-  view.w = w; view.h = h;
-  const sc = Math.min(availW / w, availH / h);
-  cv.style.width = Math.floor(w * sc) + 'px'; cv.style.height = Math.floor(h * sc) + 'px';
+  view.w = w; view.h = h; if (!cam) { view.x = 0; view.y = 0; }
+  const key = cssW + 'x' + cssH;
+  if (key !== FIT.key) { FIT.key = key; cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px'; g.style.setProperty('--bw', cssW + 'px'); }
 }
 window.addEventListener('resize', fitView);
+if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if (inGame()) fitView(); }); ro.observe($('hudrow')); ro.observe($('gamebar')); }
+// Fullskjerm: knapp i linja under brettet og F-tasten
+function toggleFull() {
+  const d = document, el = d.documentElement;
+  if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+  else { const r = el.requestFullscreen || el.webkitRequestFullscreen; if (r) { const p = r.call(el); if (p && p.catch) p.catch(() => {}); } }
+}
+if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) $('btnFull').style.display = 'none';
+$('btnFull').addEventListener('click', () => { toggleFull(); $('btnFull').blur(); });
+document.addEventListener('fullscreenchange', () => { $('btnFull').classList.toggle('on', !!document.fullscreenElement); fitView(); });
 function present(dt) {
   const ww = FW * TS, wh = FH * TS, me = disp[mySlot];
   let tx = ww / 2 - view.w / 2, ty = wh / 2 - view.h / 2;
@@ -838,6 +868,7 @@ window.addEventListener('keydown', e => {
   if (!inGame() || e.target.tagName === 'INPUT') return;
   if (KEYMAP[e.code]) { pushDir(KEYMAP[e.code]); e.preventDefault(); }
   else if (e.code === 'Space' || e.code === 'KeyX' || e.code === 'Enter') { if (!e.repeat) bombSeq++; e.preventDefault(); }
+  else if (e.code === 'KeyF' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) { toggleFull(); e.preventDefault(); }
 });
 window.addEventListener('keyup', e => { if (KEYMAP[e.code]) popDir(KEYMAP[e.code]); });
 window.addEventListener('blur', () => { keyStack.length = 0; padPid = null; padDir = null; document.querySelectorAll('.dpad button.on').forEach(b => b.classList.remove('on')); });
@@ -881,7 +912,7 @@ const touchBox = $('touch');
 ['touchstart', 'touchmove', 'touchend', 'gesturestart', 'dblclick', 'contextmenu'].forEach(ev => touchBox.addEventListener(ev, e => { if (e.cancelable) e.preventDefault(); }, { passive: false }));
 document.addEventListener('visibilitychange', () => { if (document.hidden) { padPid = null; setPadDir(null); } });
 if (window.matchMedia && matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
-window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+window.addEventListener('touchstart', () => { document.body.classList.add('touch'); fitView(); }, { once: true, passive: true });
 
 // ---------- Rom og nettverk ----------
 const net = { role: 'none', peer: null, conns: new Map(), hostConn: null, fast: new Map(), hostFast: null };
@@ -1326,5 +1357,5 @@ function audioEvents(a, s) {
 requestAnimationFrame(frame);
 
 // Lesetilgang for testing
-window.bomberboyz = { get rules() { return { spiral: SPIRAL.slice(), sdStart: SD_START, sdStep: SD_STEP, limit: ROUND_LIMIT, ready: READY_TIME, cols: COLS, rows: ROWS }; }, get snap() { return lastSnap; }, get game() { return game; }, get role() { return net.role; }, get slot() { return mySlot; }, get members() { return room.members; }, get map() { return mapId; }, get view() { return Object.assign({}, view); }, get room() { return room; } };
+window.bomberboyz = { get rules() { return { spiral: SPIRAL.slice(), sdStart: SD_START, sdStep: SD_STEP, limit: ROUND_LIMIT, ready: READY_TIME, cols: COLS, rows: ROWS }; }, get snap() { return lastSnap; }, get game() { return game; }, get role() { return net.role; }, get slot() { return mySlot; }, get members() { return room.members; }, get map() { return mapId; }, get view() { return Object.assign({}, view); }, get fit() { return Object.assign({}, FIT); }, get room() { return room; } };
 })();

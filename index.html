@@ -51,7 +51,6 @@
   .slot.empty { opacity:.45; }
   .slot .nm { font-weight:bold; } .slot .tag { font-size:12px; opacity:.7; }
   #game { max-width: 900px; padding:6px; }
-  body.bigmap #game { max-width: 1500px; }
   #hud { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-bottom:6px; font-size:14px; }
   .hp { display:flex; align-items:center; gap:6px; padding:4px 8px; background:#12151d; border:2px solid var(--edge); }
   #hud { padding: 0 54px; }
@@ -68,6 +67,13 @@
   #over table { width:100%; border-collapse: collapse; margin:10px 0 14px; font-size:18px; }
   #over td { padding:6px; border-bottom: 2px solid var(--edge); text-align:left; }
   #over td.s { text-align:right; font-weight:bold; color:#ffd23a; }
+  /* spillskjermen bruker hele vinduet; brettet skaleres i game.js (fitView) */
+  #game.screen { max-width:none; padding:6px 10px; }
+  #hudrow, #gamebar { width:100%; max-width: max(var(--bw, 900px), 720px); margin-left:auto; margin-right:auto; }
+  #gamebar .gbtns { display:flex; gap:8px; flex:0 0 auto; }
+  #btnFull.on { background:#ffd23a; }
+  body.touch.tside #touch { position:fixed; left:0; right:0; top:50%; transform:translateY(-50%); margin:0; padding:0 18px; pointer-events:none; z-index:5; }
+  body.touch.tside #touch > * { pointer-events:auto; }
   #wintxt { font-size:26px; color:#ffd23a; margin-bottom:6px; }
   #touch { display:none; justify-content:space-between; align-items:center; margin-top:10px; padding: 0 6px; }
   body.touch #touch { display:flex; }
@@ -295,9 +301,9 @@
     <button id="tbomb">BOMBE</button>
   </div>
   <div id="gamebar">
-    <span class="keys">Piltaster/WASD flytter · Mellomrom legger bombe</span>
+    <span class="keys">Piltaster/WASD flytter · Mellomrom legger bombe · F = fullskjerm</span>
     <span id="netInfo"></span>
-    <button class="red" id="btnQuit">Avslutt</button>
+    <span class="gbtns"><button class="grey" id="btnFull" title="Fullskjerm (F)">⛶ Fullskjerm</button><button class="red" id="btnQuit">Avslutt</button></span>
   </div>
 </section>
 
