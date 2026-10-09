@@ -3,15 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>BomberBoyz 2 med video – testversjon</title>
+<title>BomberBoyz 2 – bombespill for opptil fire</title>
 <meta name="description" content="BomberBoyz 2: retro bombespill i nettleseren for opptil fire spillere online. Ingen installasjon.">
 <meta name="application-name" content="BomberBoyz 2">
 <meta name="apple-mobile-web-app-title" content="BomberBoyz 2">
-<meta property="og:title" content="BomberBoyz 2 med video (test)">
+<meta property="og:title" content="BomberBoyz 2">
 <meta property="og:description" content="Retro bombespill i nettleseren for opptil fire spillere online. Ingen installasjon.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://bomberboyz.no/">
-<link rel="canonical" href="https://bomberboyz.no/">
+<meta name="robots" content="noindex">
+<meta property="og:url" content="https://bomberboyz.no/legacy/">
+<link rel="canonical" href="https://bomberboyz.no/legacy/">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='7' cy='9' r='6' fill='%23141418'/><rect x='10' y='1' width='3' height='3' fill='%23ffb020'/></svg>">
 <style>
   :root { --bg:#0e1016; --panel:#1b1f2a; --edge:#3a4152; --txt:#f1f1e8; --acc:#ffb020; --grn:#207a30; }
@@ -76,66 +77,6 @@
   .keys { opacity:.75; }
   body.touch .keys { display:none; }
   footer { font-size:12px; opacity:.5; text-align:center; padding:10px; }
-
-  /* ---------- Video- og lydchat ---------- */
-  .testbadge { display:block; width:max-content; margin:0 auto 10px; font-size:12px; font-weight:bold; letter-spacing:1px;
-    background:#7ec8ff; color:#111; padding:3px 10px; box-shadow:3px 3px 0 #000; }
-  #game.screen { max-width: 1160px; }
-  #stage { display:flex; gap:12px; align-items:flex-start; justify-content:center; }
-  #stage #wrap { flex: 1 1 auto; width:auto; min-width:0; }
-  #avGame { flex: 0 0 196px; }
-  #avbar { display:none; }
-  #avbar.on { display:block; }
-  #avctl { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
-  #avctl button { flex:1 1 auto; font-size:13px; padding:7px 8px; background:#9be37a; white-space:nowrap; }
-  #avctl button.off { background:#ff6b5a; }
-  #avctl #avHide { background:#b8bec8; } #avctl #avHide.off { background:#ffd23a; }
-  #avctl #avTap { background:#ffd23a; flex-basis:100%; animation: avpulse 1s infinite alternate; }
-  @keyframes avpulse { to { filter: brightness(1.25); } }
-  #avStatus { font-size:12px; opacity:.8; line-height:1.4; margin:0 0 8px; }
-  #avStatus:empty { display:none; }
-  #vtiles { display:grid; grid-template-columns: 1fr; gap:10px; }
-  .vt { --c:#888; --lvl:0; position:relative; aspect-ratio: 4 / 3; background:#0b0d12; overflow:hidden;
-    border:3px solid var(--c); box-shadow: 4px 4px 0 #000; transition: box-shadow .12s, transform .12s; }
-  .vt.talk { box-shadow: 0 0 0 3px #fff, 0 0 18px 6px var(--c), 4px 4px 0 #000; }
-  .vt video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; opacity:0; background:#000; }
-  .vt.me video { transform: scaleX(-1); }
-  .vt.cam video { opacity:1; }
-  .vt-av { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-    background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--c) 35%, #12151d), #0b0d12 75%); }
-  .vt-av canvas { width:44%; height:auto; image-rendering:pixelated; }
-  .vt.cam .vt-av { display:none; }
-  .vt-st { position:absolute; top:6px; left:0; right:0; text-align:center; font-size:11px; opacity:.8; }
-  .vt-nm { position:absolute; left:0; bottom:0; display:flex; align-items:center; gap:5px; max-width:100%;
-    font-size:12px; font-weight:bold; padding:3px 7px 3px 5px; background:rgba(0,0,0,.72); }
-  .vt-nm i { flex:0 0 auto; width:9px; height:9px; background:var(--c); }
-  .vt-nm span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .vt-mic { display:none; position:absolute; top:4px; right:4px; font-size:13px; background:rgba(0,0,0,.72); padding:1px 4px; }
-  .vt.mute .vt-mic { display:block; }
-  .vt-lvl { position:absolute; right:5px; bottom:5px; width:5px; height:34%; background:rgba(0,0,0,.55); display:flex; align-items:flex-end; }
-  .vt-lvl b { display:block; width:100%; height:calc(var(--lvl) * 100%); background:#9be37a; transition: height .08s; }
-  .vt.mute .vt-lvl { display:none; }
-  #avbar.hid .vt { aspect-ratio:auto; height:40px; }
-  #avbar.hid .vt-av canvas { width:24px; } #avbar.hid .vt-av { justify-content:flex-end; padding-right:18px; }
-  #avbar.hid .vt-st { display:none; }
-  #avbar.hid .vt-nm { top:0; background:transparent; }
-  #avLobby #vtiles { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  #avLobby { margin-top:12px; }
-  @media (max-width: 860px) {
-    #stage { flex-direction:column-reverse; align-items:stretch; gap:6px; }
-    #avGame { flex: 0 0 auto; }
-    #avGame #vtiles { grid-template-columns: repeat(4, 1fr); gap:6px; }
-    #avGame #avctl button span { display:none; }
-    #avGame #avctl button { font-size:16px; padding:5px 6px; }
-    #avGame #avStatus { display:none; }
-    #avGame .vt { border-width:2px; box-shadow: 2px 2px 0 #000; }
-    #avGame .vt-nm { font-size:10px; padding:1px 4px; }
-    #avGame .vt-lvl, #avGame .vt-st { display:none; }
-    #avGame #avbar.hid .vt { height:26px; }
-    #avGame #avbar.hid .vt-av canvas { width:16px; }
-    #cv { width: min(100%, calc((100vh - 230px) * 240 / 208)); }
-    body.touch #cv { width: min(100%, calc((100vh - 360px) * 240 / 208)); }
-  }
 </style>
 </head>
 <body>
@@ -144,7 +85,6 @@
 <section id="menu" class="screen on">
   <h1>BOMBERBOYZ 2</h1>
   <div class="sub">Retro bombespill for 1–4 spillere – rett i nettleseren</div>
-  <span class="testbadge">NÅ MED VIDEO OG LYD</span>
 
   <div class="panel">
     <label for="name">Ditt navn</label>
@@ -160,7 +100,7 @@
   <div class="panel">
     <h2>Spill med venner</h2>
     <button class="big" id="btnCreate">Lag rom</button>
-    <div class="hint">Du får en romkode og en lenke du kan dele. Opptil tre venner kan bli med. Nettleseren spør om kamera og mikrofon – sier du nei, kan du likevel spille.</div>
+    <div class="hint">Du får en romkode og en lenke du kan dele. Opptil tre venner kan bli med.</div>
     <div style="height:14px"></div>
     <label for="joinCode">Har du en kode eller lenke?</label>
     <div class="row">
@@ -189,7 +129,6 @@
       <button class="alt" id="btnShare" style="flex:0 0 auto; display:none">Del</button>
     </div>
     <div class="slots" id="slots"></div>
-    <div id="avLobby"></div>
     <div id="hostCtl" class="row">
       <button class="grey" id="btnAddBot">+ Legg til bot</button>
       <button class="grey" id="btnDelBot">– Fjern bot</button>
@@ -206,7 +145,6 @@
 <!-- SPILL -->
 <section id="game" class="screen">
   <div id="hud"></div>
-  <div id="stage">
   <div id="wrap">
     <canvas id="cv" width="240" height="208"></canvas>
     <div id="over">
@@ -221,8 +159,6 @@
         <div id="overWait" class="hint" style="font-size:16px">Venter på at verten starter ny runde …</div>
       </div>
     </div>
-  </div>
-  <div id="avGame"></div>
   </div>
   <div id="touch">
     <div class="dpad">
@@ -240,20 +176,7 @@
   </div>
 </section>
 
-<!-- Video/lyd: flyttes mellom lobbyen og spillet -->
-<div id="avbar">
-  <div id="avctl">
-    <button id="avMic" type="button">🎤 <span>Mikrofon</span></button>
-    <button id="avCam" type="button">📷 <span>Kamera</span></button>
-    <button id="avHide" type="button">🙈 <span>Skjul video</span></button>
-    <button id="avTap" type="button" style="display:none">🔊 Trykk for å høre de andre</button>
-  </div>
-  <div id="avStatus"></div>
-  <div id="vtiles"></div>
-</div>
-
 <script src="peerjs.min.js"></script>
-<script src="video.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

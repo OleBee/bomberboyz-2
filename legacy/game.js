@@ -1,5 +1,4 @@
-/* BomberBoyz 2 – original retro bombespill. All grafikk tegnes i kode.
-   Prototype med video- og lydchat (se video.js). */
+/* BomberBoyz 2 – original retro bombespill. All grafikk tegnes i kode. */
 'use strict';
 (() => {
 // ---------- Konstanter ----------
@@ -11,7 +10,7 @@ const COLORS = [
   { c: '#e8483c', n: 'Rød' }, { c: '#3c7ae8', n: 'Blå' },
   { c: '#f0c020', n: 'Gul' }, { c: '#a050e0', n: 'Lilla' }];
 const STARTS = [[0, 0], [12, 10], [12, 0], [0, 10]];
-const PEER_PREFIX = 'bomberboyz2-video-v1-';   // egne rom, kolliderer ikke med hovedspillet
+const PEER_PREFIX = 'bomberboyz2-v1-';
 const SD_START = 90, SD_STEP = 0.4;   // «tiden renner ut»: brettet krymper fra 90 s
 const SPIRAL = (() => { const o = []; let x0 = 0, y0 = 0, x1 = COLS - 1, y1 = ROWS - 1;
   while (x0 <= x1 && y0 <= y1) {
@@ -589,17 +588,14 @@ const net = { role: 'none', peer: null, conns: new Map(), hostConn: null };
 const room = { code: '', members: [], scores: [0, 0, 0, 0], phase: 'lobby' };
 let mySlot = 0, game = null, lastSnap = null, lastEx = 0;
 
+function isDefaultName(n) { return /^spiller( ?\d+)?$/i.test(String(n || '').trim()); }
 function myName() {
   let n = ($('name').value || '').trim().slice(0, 12);
-  if (!n) n = 'Spiller';
-  try { localStorage.setItem('bk-name', n); } catch (e) { }
-  return n;
+  // Tomt felt gir standardnavnet, men det lagres ikke – feltet skal ikke fylles med «Spiller» neste gang
+  try { if (n && !isDefaultName(n)) localStorage.setItem('bk-name', n); else localStorage.removeItem('bk-name'); } catch (e) { }
+  return n || 'Spiller';
 }
-function show(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  const bar = $('avbar'), dest = id === 'game' ? $('avGame') : id === 'lobby' ? $('avLobby') : null;
-  if (dest && bar.parentNode !== dest) dest.appendChild(bar);
-}
+function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
 function menuErr(t) { $('menuErr').textContent = t || ''; }
 function genCode() { let s = ''; for (let i = 0; i < 5; i++) s += CODE_ABC[Math.floor(Math.random() * CODE_ABC.length)]; return s; }
 function parseCode(v) {
@@ -612,7 +608,6 @@ function parseCode(v) {
 function shareUrl() { return location.origin + location.pathname + '?rom=' + room.code; }
 
 function resetNet() {
-  BBAV.stop();
   try { if (net.peer) net.peer.destroy(); } catch (e) { }
   net.role = 'none'; net.peer = null; net.conns.clear(); net.hostConn = null;
   game = null; lastSnap = null; room.members = []; room.scores = [0, 0, 0, 0]; room.phase = 'lobby'; room.code = '';
@@ -625,12 +620,7 @@ function leave(msg) {
 
 // --- Vert ---
 function freeSlot() { for (let s = 0; s < 4; s++) if (!room.members.some(m => m.slot === s)) return s; return -1; }
-function lobbyMsg() { return { t: 'lobby', code: room.code, phase: room.phase, members: room.members.map(m => ({ slot: m.slot, name: m.name, bot: !!m.bot,
-  peerId: m.me ? (net.peer && net.peer.id) || '' : m.peerId || '', av: m.me ? BBAV.state() : m.av || null })) }; }
-function avSync() {
-  if (net.role === 'none' || !room.code) return;
-  BBAV.sync(lobbyMsg().members, net.peer && net.peer.id, mySlot);
-}
+function lobbyMsg() { return { t: 'lobby', code: room.code, phase: room.phase, members: room.members.map(m => ({ slot: m.slot, name: m.name, bot: !!m.bot })) }; }
 function broadcast(msg) { for (const c of net.conns.values()) { if (c.open) { try { c.send(msg); } catch (e) { } } } }
 function hostLobbyUpdate() { broadcast(lobbyMsg()); renderLobby(); }
 
@@ -645,11 +635,10 @@ function startHosting(offline) {
     return;
   }
   menuErr('Lager rom …');
-  BBAV.start();
   const tryOpen = (attempt) => {
     const code = genCode();
     const peer = new Peer(PEER_PREFIX + code, { debug: 1 });
-    net.peer = peer; BBAV.attachPeer(peer);
+    net.peer = peer;
     peer.on('open', () => {
       room.code = code; menuErr('');
       history.replaceState(null, '', '?rom=' + code);
@@ -685,9 +674,8 @@ function hostOnData(conn, d) {
       if (bot && room.phase !== 'play') { room.members = room.members.filter(m => m !== bot); s = freeSlot(); }
     }
     if (s < 0) { conn.send({ t: 'full' }); setTimeout(() => conn.close(), 500); return; }
-    const name = String(d.name || 'Spiller').slice(0, 12);
-    room.members.push({ slot: s, name, bot: false, conn, peerId: conn.peer, input: { dir: null }, lastBs: 0,
-      av: d.av ? { mic: !!d.av.mic, cam: !!d.av.cam } : null });
+    const name = String(d.name || '').trim().slice(0, 12) || ('Spiller ' + (s + 1));
+    room.members.push({ slot: s, name, bot: false, conn, peerId: conn.peer, input: { dir: null }, lastBs: 0 });
     room.members.sort((a, b) => a.slot - b.slot);
     net.conns.set(conn.peer, conn);
     conn.send({ t: 'welcome', slot: s });
@@ -700,9 +688,6 @@ function hostOnData(conn, d) {
     const p = game && game.players.find(p => p.slot === m.slot);
     if (p) { p.input.dir = dir; if (typeof d.b === 'number' && d.b > m.lastBs) p.input.bomb = true; }
     if (typeof d.b === 'number') m.lastBs = Math.max(m.lastBs, d.b);
-  } else if (d.t === 'av') {
-    const m = room.members.find(m => m.peerId === conn.peer); if (!m) return;
-    m.av = { mic: !!d.mic, cam: !!d.cam }; hostLobbyUpdate();
   }
 }
 function hostDrop(conn) {
@@ -748,15 +733,14 @@ function joinRoom(code) {
   resetNet();
   net.role = 'client'; room.code = code;
   menuErr('Kobler til rom ' + code + ' …');
-  BBAV.start();
   const peer = new Peer({ debug: 1 });
-  net.peer = peer; BBAV.attachPeer(peer);
+  net.peer = peer;
   clearTimeout(joinTimer);
   joinTimer = setTimeout(() => { if (net.role === 'client' && !net.hostConn?.open) leave('Fikk ikke kontakt med rom ' + code + '. Sjekk koden, eller prøv igjen.'); }, 20000);
   peer.on('open', () => {
     const conn = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: 'json' });
     net.hostConn = conn;
-    conn.on('open', () => { conn.send({ t: 'hello', name: myName(), av: BBAV.state() }); });
+    conn.on('open', () => { conn.send({ t: 'hello', name: isDefaultName(myName()) ? '' : myName() }); });
     conn.on('data', clientOnData);
     conn.on('close', () => { if (net.role === 'client') leave('Forbindelsen til verten ble brutt.'); });
     conn.on('error', () => { });
@@ -818,7 +802,6 @@ function renderLobby() {
   $('btnDelBot').disabled = !room.members.some(m => m.bot);
   $('btnStart').disabled = room.members.length < 2;
   $('btnStart').textContent = room.members.length < 2 ? 'Start (trenger minst 2)' : 'Start';
-  avSync();
 }
 let hudKey = '', overKey = '';
 function updateHud(s) {
@@ -877,18 +860,10 @@ $('btnCopy').onclick = async () => {
 };
 $('btnShare').onclick = () => { navigator.share({ title: 'BomberBoyz 2', text: 'Bli med på BomberBoyz 2! Romkode: ' + room.code, url: shareUrl() }).catch(() => { }); };
 
-// Video/lyd: medie-tilstand sendes via verten slik at alle ser hvem som har kamera og mikrofon på
-BBAV.init({ icon: slot => { const c = mk(16, 16); c.getContext('2d').drawImage(robotSprite(slot, 'down', 0), 0, 0); return c; } });
-BBAV.onState = st => {
-  if (net.role === 'host') { const me = room.members.find(m => m.me); if (me) { me.av = st; if (room.code) hostLobbyUpdate(); } }
-  else if (net.role === 'client' && net.hostConn && net.hostConn.open) { try { net.hostConn.send({ t: 'av', mic: st.mic, cam: st.cam }); } catch (e) { } }
-};
-
-// Lukker forbindelser ryddig når fanen lukkes, så de andre ser at du gikk med en gang
-window.addEventListener('pagehide', () => { if (net.role !== 'none') { BBAV.stop(); try { net.peer && net.peer.destroy(); } catch (e) { } } });
-
 // Navn og invitasjon fra lenke
-try { $('name').value = localStorage.getItem('bk-name') || ''; } catch (e) { }
+try { const saved = localStorage.getItem('bk-name') || ''; $('name').value = isDefaultName(saved) ? '' : saved; } catch (e) { }
+// Lagret navn markeres når feltet får fokus, så det du skriver erstatter det med en gang
+$('name').addEventListener('focus', e => { const el = e.target; setTimeout(() => { if (document.activeElement === el) el.select(); }, 0); });
 const inviteCode = parseCode(new URLSearchParams(location.search).get('rom') || '');
 if (inviteCode) { $('invitePanel').style.display = ''; $('inviteCode').textContent = inviteCode; $('joinCode').value = inviteCode; }
 
@@ -913,5 +888,5 @@ function frame() {
 requestAnimationFrame(frame);
 
 // Lesetilgang for testing
-window.bomberboyz = { get av() { return BBAV.debug; }, get snap() { return lastSnap; }, get game() { return game; }, get role() { return net.role; }, get slot() { return mySlot; }, get members() { return room.members; } };
+window.bomberboyz = { get snap() { return lastSnap; }, get game() { return game; }, get role() { return net.role; }, get slot() { return mySlot; }, get members() { return room.members; } };
 })();
