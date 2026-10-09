@@ -213,6 +213,9 @@
     #hud .hp i { width:9px; height:9px; }
     #hudrow { grid-template-columns: 0 1fr 30px; gap:4px; }
   }
+  #touch, #touch * { touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
+  .dpad { touch-action:none; }
+  .dpad button.on, #tbomb.on { transform: translate(2px,2px); filter: brightness(1.25); box-shadow: inset -4px -4px 0 rgba(0,0,0,.35), 2px 2px 0 #000; }
 </style>
 </head>
 <body data-screen="menu">

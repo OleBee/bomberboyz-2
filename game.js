@@ -799,13 +799,46 @@ window.addEventListener('keydown', e => {
   else if (e.code === 'Space' || e.code === 'KeyX' || e.code === 'Enter') { if (!e.repeat) bombSeq++; e.preventDefault(); }
 });
 window.addEventListener('keyup', e => { if (KEYMAP[e.code]) popDir(KEYMAP[e.code]); });
-window.addEventListener('blur', () => { keyStack.length = 0; });
-document.querySelectorAll('.dpad button').forEach(b => {
-  const d = b.dataset.dir;
-  b.addEventListener('pointerdown', e => { e.preventDefault(); b.setPointerCapture && b.setPointerCapture(e.pointerId); pushDir(d); });
-  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => b.addEventListener(ev, () => popDir(d)));
+window.addEventListener('blur', () => { keyStack.length = 0; padPid = null; padDir = null; document.querySelectorAll('.dpad button.on').forEach(b => b.classList.remove('on')); });
+// Styrekors: hele korset er én sone som følger fingeren – skli fra en retning til en annen uten å løfte.
+// Retning = dominerende akse fra midten av korset, med dødsone i midten og hysterese mellom aksene (ikke flimring).
+const dpad = document.querySelector('.dpad'), dpadBtn = {};
+dpad.querySelectorAll('button').forEach(b => { dpadBtn[b.dataset.dir] = b; });
+const DEAD = 12, HYST = 1.3;
+let padPid = null, padDir = null;
+function setPadDir(d) {
+  if (d === padDir) return;
+  if (padDir) { popDir(padDir); dpadBtn[padDir].classList.remove('on'); }
+  padDir = d;
+  if (d) { pushDir(d); dpadBtn[d].classList.add('on'); }
+}
+function padTrack(e) {
+  const r = dpad.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+  const ax = Math.abs(dx), ay = Math.abs(dy);
+  if (Math.max(ax, ay) < DEAD) { setPadDir(null); return; }
+  const horiz = padDir === 'left' || padDir === 'right', vert = padDir === 'up' || padDir === 'down';
+  let useX = ax > ay;
+  if (horiz && ay < ax * HYST) useX = true;          // bli på samme akse til den andre er tydelig større
+  else if (vert && ax < ay * HYST) useX = false;
+  setPadDir(useX ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down'));
+}
+function padEnd(e) { if (e.pointerId !== padPid) return; padPid = null; setPadDir(null); }
+dpad.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (padPid !== null && padPid !== e.pointerId) return;   // én finger styrer korset
+  padPid = e.pointerId;
+  try { dpad.setPointerCapture(e.pointerId); } catch (err) { }
+  padTrack(e);
 });
-$('tbomb').addEventListener('pointerdown', e => { e.preventDefault(); bombSeq++; });
+dpad.addEventListener('pointermove', e => { if (e.pointerId === padPid) { e.preventDefault(); padTrack(e); } });
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => dpad.addEventListener(ev, padEnd));
+// Bombe bare ved eget trykk (pointerdown starter her) – å skli inn fra korset utløser den ikke. Egen finger = samtidig med styring.
+$('tbomb').addEventListener('pointerdown', e => { e.preventDefault(); bombSeq++; $('tbomb').classList.add('on'); });
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => $('tbomb').addEventListener(ev, () => $('tbomb').classList.remove('on')));
+// iOS: ingen rulling, zoom (også dobbelttrykk), markering eller kontekstmeny på kontrollene
+const touchBox = $('touch');
+['touchstart', 'touchmove', 'touchend', 'gesturestart', 'dblclick', 'contextmenu'].forEach(ev => touchBox.addEventListener(ev, e => { if (e.cancelable) e.preventDefault(); }, { passive: false }));
+document.addEventListener('visibilitychange', () => { if (document.hidden) { padPid = null; setPadDir(null); } });
 if (window.matchMedia && matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
 window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
 
