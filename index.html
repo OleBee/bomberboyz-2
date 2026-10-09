@@ -171,7 +171,13 @@
     <h2>Spill alene</h2>
     <button class="big grey" id="btnSolo">Spill mot boter</button>
   </div>
-  <footer>Styring: piltaster eller WASD, mellomrom = bombe. På mobil brukes knappene under brettet.<br>Power-ups: 💣 flere bomber · 🔥 lengre flamme · ⚡ fart · 🥊 Boksehanske: dytt bomber</footer>
+  <div class="bbx-board" id="lbPanel">
+    <h2>🏆 BESTE SPILLERE</h2>
+    <div id="lbTabs" style="display:none"><button type="button" data-t="local" class="on">Denne enheten</button><button type="button" data-t="global">Alle spillere</button></div>
+    <div id="lbList"></div>
+    <div class="hint">Seire, runder og drap per navn. Boter telles ikke.</div>
+  </div>
+  <footer>Styring: piltaster eller WASD, mellomrom = bombe, M = lyd av/på. På mobil brukes knappene under brettet.<br>Power-ups: 💣 flere bomber · 🔥 lengre flamme · ⚡ fart · 🥊 Boksehanske: dytt bomber</footer>
 </section>
 
 <!-- LOBBY -->
@@ -186,6 +192,7 @@
       <button class="alt" id="btnShare" style="flex:0 0 auto; display:none">Del</button>
     </div>
     <div class="slots" id="slots"></div>
+    <div id="roomBoard"></div>
     <div id="avLobby"></div>
     <div id="hostCtl" class="row">
       <button class="grey" id="btnAddBot">+ Legg til bot</button>
@@ -251,6 +258,8 @@
 
 <script src="peerjs.min.js"></script>
 <script src="video.js"></script>
+<script src="bbx-config.js"></script>
+<script src="bbx.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

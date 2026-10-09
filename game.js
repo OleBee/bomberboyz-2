@@ -166,6 +166,7 @@ class Game {
       alive: true, deathT: 0, maxBombs: 1, range: 2, speedLv: 0, glove: false, dir: 'down', moving: false,
       input: { dir: null, bomb: false }, ai: { cd: 0.5 + Math.random() * 0.5, jit: {}, jitT: 0, step: null, from: null } }));
     this.bombs = []; this.bombId = 0; this.flames = new Map(); this.burning = new Map();
+    this.kills = [0, 0, 0, 0];
     this.phase = 'play'; this.endT = 0; this.winner = -1; this.time = 0; this.exCount = 0; this.sdIdx = 0;
   }
   cell(x, y) { return (x < 0 || y < 0 || x >= COLS || y >= ROWS) ? '#' : this.grid[y * COLS + x]; }
@@ -211,7 +212,8 @@ class Game {
       for (const p of this.players) if (p.alive && Math.round(p.x) === x && Math.round(p.y) === y) { p.alive = false; p.deathT = 0; }
     }
     for (const p of this.players) {
-      if (p.alive && this.flames.has(Math.round(p.y) * COLS + Math.round(p.x))) { p.alive = false; p.deathT = 0; }
+      const f = p.alive && this.flames.get(Math.round(p.y) * COLS + Math.round(p.x));
+      if (f) { p.alive = false; p.deathT = 0; if (f.o != null && f.o !== p.slot) this.kills[f.o]++; }
     }
     if (this.phase === 'play') {
       const alive = this.players.filter(p => p.alive);
@@ -258,9 +260,10 @@ class Game {
     const pass = new Set(this.players.filter(q => q.alive && Math.abs(q.x - tx) < 1 && Math.abs(q.y - ty) < 1).map(q => q.slot));
     this.bombs.push({ id: ++this.bombId, x: tx, y: ty, t: BOMB_TIME, range: p.range, owner: p.slot, pass, slide: null, prog: 0 });
   }
-  addFlame(x, y, k) {
+  addFlame(x, y, k, o) {
     const i = y * COLS + x, e = this.flames.get(i);
-    if (!e) { this.flames.set(i, { k, t: FLAME_TIME }); return; }
+    if (!e) { this.flames.set(i, { k, t: FLAME_TIME, o }); return; }
+    e.o = o;
     const ax = s => 'hlr'.includes(s) ? 'h' : ('vud'.includes(s) ? 'v' : 'c');
     if (e.k !== k) e.k = (ax(e.k) === ax(k) && ax(k) !== 'c') ? ax(k) : 'c';
     e.t = FLAME_TIME;
@@ -271,7 +274,7 @@ class Game {
       const b = q.shift(), bi = this.bombs.indexOf(b);
       if (bi < 0) continue;
       this.bombs.splice(bi, 1); this.exCount++;
-      this.addFlame(b.x, b.y, 'c');
+      this.addFlame(b.x, b.y, 'c', b.owner);
       for (const [dx, dy, ax, end] of [[1, 0, 'h', 'r'], [-1, 0, 'h', 'l'], [0, 1, 'v', 'd'], [0, -1, 'v', 'u']]) {
         for (let s = 1; s <= b.range; s++) {
           const x = b.x + dx * s, y = b.y + dy * s, c = this.cell(x, y), i = y * COLS + x;
@@ -284,8 +287,8 @@ class Game {
           }
           const ob = this.bombAt(x, y);
           if (ob) { q.push(ob); break; }
-          if (c === 'B' || c === 'F' || c === 'S' || c === 'G') { this.grid[i] = '.'; this.addFlame(x, y, end); break; }
-          this.addFlame(x, y, s === b.range ? end : ax);
+          if (c === 'B' || c === 'F' || c === 'S' || c === 'G') { this.grid[i] = '.'; this.addFlame(x, y, end, b.owner); break; }
+          this.addFlame(x, y, s === b.range ? end : ax, b.owner);
         }
       }
     }
@@ -470,8 +473,8 @@ function snapshot(g) {
     f: [...g.flames].map(([i, f]) => [i, f.k, +f.t.toFixed(2)]),
     x: [...g.burning].map(([i, w]) => [i, +w.t.toFixed(2)]),
     p: g.players.map(p => [p.slot, +p.x.toFixed(3), +p.y.toFixed(3), p.alive ? 1 : 0, p.dir[0],
-      p.moving ? 1 : 0, +p.deathT.toFixed(2), p.maxBombs, p.range, p.speedLv, p.name, p.bot ? 1 : 0, p.glove ? 1 : 0]),
-    sc: room.scores.slice(),
+      p.moving ? 1 : 0, +p.deathT.toFixed(2), p.maxBombs, p.range, p.speedLv, p.name, p.bot ? 1 : 0, p.glove ? 1 : 0, g.kills[p.slot] || 0]),
+    sc: room.scores.slice(), rn: room.round, lb: boardArr(),
   };
 }
 
@@ -601,18 +604,7 @@ function render(s, now, dt) {
 }
 
 // ---------- Lyd ----------
-let actx = null;
-function unlockAudio() { if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { } } if (actx && actx.state === 'suspended') actx.resume(); }
-function boom() {
-  if (!actx || actx.state !== 'running') return;
-  const len = 0.45, buf = actx.createBuffer(1, actx.sampleRate * len, actx.sampleRate), d = buf.getChannelData(0);
-  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
-  const src = actx.createBufferSource(); src.buffer = buf;
-  const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 900;
-  const gn = actx.createGain(); gn.gain.value = 0.35;
-  src.connect(f); f.connect(gn); gn.connect(actx.destination); src.start();
-}
-['pointerdown', 'keydown', 'touchstart'].forEach(e => window.addEventListener(e, unlockAudio, { passive: true }));
+// Musikk og lydeffekter ligger i bbx.js (BBX).
 
 // ---------- Input ----------
 const keyStack = []; let bombSeq = 0;
@@ -639,7 +631,29 @@ window.addEventListener('touchstart', () => document.body.classList.add('touch')
 
 // ---------- Rom og nettverk ----------
 const net = { role: 'none', peer: null, conns: new Map(), hostConn: null };
-const room = { code: '', members: [], scores: [0, 0, 0, 0], phase: 'lobby' };
+const room = { code: '', members: [], scores: [0, 0, 0, 0], phase: 'lobby', board: {}, lb: [], round: 0 };
+// Rommets toppliste: verten teller seire/runder/drap per navn så lenge rommet lever
+function boardArr() {
+  return Object.values(room.board).sort((a, b) => b.w - a.w || b.k - a.k || a.g - b.g).map(e => [e.n, e.w, e.g, e.k, e.b ? 1 : 0]);
+}
+function boardRows(lb) {
+  return (lb || []).map(([n, w, g, k, b]) => {
+    const m = room.members.find(m => m.name === n);
+    return { n, w, g, k, b: !!b, c: m ? COLORS[m.slot].c : null, me: !!(m && m.slot === mySlot && !m.bot) };
+  });
+}
+function boardPanel(lb, title) {
+  const d = document.createElement('div'); d.className = 'bbx-board';
+  const h = document.createElement('h2'); h.textContent = title; d.appendChild(h);
+  d.appendChild(BBX.table(boardRows(lb))); return d;
+}
+function hostScoreRound(g) {
+  for (const p of g.players) {
+    const e = room.board[p.name] || (room.board[p.name] = { n: p.name, w: 0, g: 0, k: 0, b: !!p.bot });
+    e.g++; if (g.winner === p.slot) e.w++; e.k += g.kills[p.slot] || 0;
+  }
+  room.lb = boardArr();
+}
 let mySlot = 0, game = null, lastSnap = null, lastEx = 0;
 
 function isDefaultName(n) { return /^spiller( ?\d+)?$/i.test(String(n || '').trim()); }
@@ -650,6 +664,7 @@ function myName() {
   return n || 'Spiller';
 }
 function show(id) {
+  if (id === 'menu') BBX.renderMenu();
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
   const bar = $('avbar'), dest = id === 'game' ? $('avGame') : id === 'lobby' ? $('avLobby') : null;
   if (dest && bar.parentNode !== dest) dest.appendChild(bar);
@@ -669,7 +684,7 @@ function resetNet() {
   BBAV.stop();
   try { if (net.peer) net.peer.destroy(); } catch (e) { }
   net.role = 'none'; net.peer = null; net.conns.clear(); net.hostConn = null;
-  game = null; lastSnap = null; room.members = []; room.scores = [0, 0, 0, 0]; room.phase = 'lobby'; room.code = '';
+  game = null; lastSnap = null; room.members = []; room.scores = [0, 0, 0, 0]; room.phase = 'lobby'; room.code = ''; room.board = {}; room.lb = []; room.round = 0;
   for (const k in disp) delete disp[k];
 }
 function leave(msg) {
@@ -679,7 +694,7 @@ function leave(msg) {
 
 // --- Vert ---
 function freeSlot() { for (let s = 0; s < 4; s++) if (!room.members.some(m => m.slot === s)) return s; return -1; }
-function lobbyMsg() { return { t: 'lobby', code: room.code, phase: room.phase, members: room.members.map(m => ({ slot: m.slot, name: m.name, bot: !!m.bot,
+function lobbyMsg() { return { t: 'lobby', lb: boardArr(), code: room.code, phase: room.phase, members: room.members.map(m => ({ slot: m.slot, name: m.name, bot: !!m.bot,
   peerId: m.me ? (net.peer && net.peer.id) || '' : m.peerId || '', av: m.me ? BBAV.state() : m.av || null })) }; }
 function avSync() {
   if (net.role === 'none' || !room.code) return;
@@ -776,7 +791,7 @@ function startRound() {
   $('lobbyErr').textContent = '';
   game = new Game(room.members);
   for (const m of room.members) if (m.peerId) m.lastBs = m.lastBs || 0;
-  room.phase = 'play'; scored = false; localBs = bombSeq;
+  room.phase = 'play'; room.round++; scored = false; localBs = bombSeq;
   for (const k in disp) delete disp[k];
   show('game'); $('over').classList.remove('on');
   lastSnap = snapshot(game);
@@ -789,7 +804,7 @@ function hostTick(dt) {
   if (me) { me.input.dir = curDir(); if (bombSeq > localBs) { localBs = bombSeq; me.input.bomb = true; } }
   let left = Math.min(dt, 0.25);
   while (left > 0) { const h = Math.min(left, 1 / 60); game.step(h); left -= h; }
-  if (game.phase === 'over' && !scored) { scored = true; if (game.winner >= 0) room.scores[game.winner]++; room.phase = 'over'; }
+  if (game.phase === 'over' && !scored) { scored = true; if (game.winner >= 0) room.scores[game.winner]++; hostScoreRound(game); room.phase = 'over'; }
   lastSnap = snapshot(game);
   sendAcc += dt;
   if (sendAcc >= 0.05) { sendAcc = 0; if (net.conns.size) broadcast(lastSnap); }
@@ -825,11 +840,11 @@ function clientOnData(d) {
   if (d.t === 'welcome') { clearTimeout(joinTimer); mySlot = d.slot; menuErr(''); show('lobby'); }
   else if (d.t === 'full') leave('Rommet er fullt (maks fire spillere).');
   else if (d.t === 'lobby') {
-    room.members = d.members; room.phase = d.phase; room.code = d.code;
+    room.members = d.members; room.phase = d.phase; room.code = d.code; room.lb = d.lb || room.lb;
     if (d.phase === 'lobby') { show('lobby'); }
     renderLobby();
   } else if (d.t === 's') {
-    lastSnap = d; room.scores = d.sc || room.scores;
+    lastSnap = d; room.scores = d.sc || room.scores; room.lb = d.lb || room.lb;
     if (!inGame() && room.members.some(m => m.slot === mySlot)) { for (const k in disp) delete disp[k]; show('game'); }
   }
 }
@@ -865,6 +880,8 @@ function renderLobby() {
     if (m) t.querySelector('.nm').textContent = m.name;
     div.appendChild(t); el.appendChild(div);
   }
+  const rb = $('roomBoard'); rb.innerHTML = '';
+  if (room.lb && room.lb.length) rb.appendChild(boardPanel(room.lb, 'BESTE I ROMMET'));
   $('hostCtl').style.display = host ? '' : 'none';
   $('btnStart').style.display = host ? '' : 'none';
   $('waitTxt').style.display = host ? 'none' : '';
@@ -889,18 +906,15 @@ function updateHud(s) {
   $('netInfo').textContent = net.role === 'host' && room.code ? 'Rom ' + room.code : net.role === 'client' ? 'Rom ' + room.code : 'Mot boter';
   const ov = $('over');
   if (s.ph === 'over') {
-    const k = s.w + '|' + JSON.stringify(s.sc) + net.role;
+    const k = s.w + '|' + JSON.stringify(s.sc) + JSON.stringify(s.lb) + net.role;
     if (k !== overKey || !ov.classList.contains('on')) {
       overKey = k;
       const wp = s.p.find(p => p[0] === s.w);
       $('wintxt').textContent = wp ? (wp[0] === mySlot ? 'Du vant runden! 🏆' : wp[10] + ' vant runden!') : 'Uavgjort!';
       const tb = $('score'); tb.innerHTML = '';
-      s.p.slice().sort((a, b) => (s.sc[b[0]] || 0) - (s.sc[a[0]] || 0)).forEach(p => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td><i style="display:inline-block;width:12px;height:12px;background:${COLORS[p[0]].c}"></i> <span></span></td><td class="s">${s.sc[p[0]] || 0}</td>`;
-        tr.querySelector('span').textContent = p[10];
-        tb.appendChild(tr);
-      });
+      const rows = s.lb && s.lb.length ? s.lb : s.p.map(p => [p[10], s.w === p[0] ? 1 : 0, 1, p[13] || 0, p[11]]);
+      const tr = document.createElement('tr'), td = document.createElement('td');
+      td.appendChild(boardPanel(rows, room.code ? 'BESTE I ROMMET' : 'STILLING')); tr.appendChild(td); tb.appendChild(tr);
       $('overHost').style.display = net.role === 'host' ? '' : 'none';
       $('btnToLobby').style.display = net.role === 'host' && room.code ? '' : 'none';
       $('overWait').style.display = net.role === 'host' ? 'none' : '';
@@ -961,10 +975,46 @@ function frame() {
   if (inGame() && lastSnap) {
     render(lastSnap, now / 1000, dt);
     updateHud(lastSnap);
-    if (lastSnap.ex > lastEx) boom();
     lastEx = lastSnap.ex;
   }
+  if (lastSnap !== audSnap) { audioEvents(audSnap, lastSnap); audSnap = lastSnap; }
+  BBX.music(!inGame() ? 'menu' : lastSnap && lastSnap.ph === 'play' && lastSnap.tm >= READY_TIME ? 'battle' : null);
   requestAnimationFrame(frame);
+}
+let audSnap = null, recorded = '';
+function audioEvents(a, s) {
+  if (!s || !s.p) return;
+  if (a && (a.rn !== s.rn || s.tm < a.tm)) a = null;   // ny runde
+  const pt = a ? a.tm : -1;
+  if (s.ph === 'play') {
+    if (pt < 0.05 && s.tm >= 0.05 || pt < 0.7 && s.tm >= 0.7) BBX.sfx('count');
+    if (pt < READY_TIME && s.tm >= READY_TIME) BBX.sfx('go');
+  }
+  if (!a) return;
+  const ids = new Set(a.b.map(b => b[5]));
+  const prevSlide = new Map(a.b.map(b => [b[5], b[3] || b[4]]));
+  for (const b of s.b) {
+    if (!ids.has(b[5])) BBX.sfx('place');
+    else if ((b[3] || b[4]) && !prevSlide.get(b[5])) BBX.sfx('kick');
+  }
+  if (s.ex > a.ex) BBX.sfx('boom');
+  const burn = new Set(a.x.map(x => x[0]));
+  if (s.x.some(x => !burn.has(x[0]))) BBX.sfx('wall');
+  for (const p of s.p) {
+    const q = a.p.find(q => q[0] === p[0]); if (!q) continue;
+    if (q[3] && !p[3]) BBX.sfx('death');
+    if (p[3] && (p[7] > q[7] || p[8] > q[8] || p[9] > q[9] || (p[12] && !q[12]))) BBX.sfx('pickup');
+  }
+  if (a.ph === 'play' && s.ph === 'over') {
+    BBX.jingle(s.w >= 0 ? 'win' : 'draw');
+    const key = room.code + '|' + net.role + '|' + s.rn;
+    if (recorded !== key) {
+      recorded = key;
+      const players = s.p.map(p => ({ name: p[10], bot: !!p[11], win: s.w === p[0], kills: p[13] || 0 }));
+      BBX.recordLocal(players);
+      if (net.role === 'host' && room.code) BBX.submitGlobal(room.code, s.rn, players);
+    }
+  }
 }
 requestAnimationFrame(frame);
 
