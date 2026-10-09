@@ -544,9 +544,10 @@ function fitView() {
   const touch = document.body.classList.contains('touch'), g = $('game');
   const gs = getComputedStyle(g), W = document.documentElement.clientWidth || window.innerWidth, H = window.innerHeight;
   const padX = parseFloat(gs.paddingLeft) + parseFloat(gs.paddingRight), padY = parseFloat(gs.paddingTop) + parseFloat(gs.paddingBottom);
-  const top = $('hudrow').offsetHeight + 6, bar = $('gamebar').offsetHeight + 8, SH = 8;   // HUD-rad, linja under, skygge
+  placeLayout(); const lcol = document.body.classList.contains('lcol');
+  const top = lcol ? 0 : $('hudrow').offsetHeight + 6, bar = lcol ? 0 : $('gamebar').offsetHeight + 8, SH = 8;   // HUD-rad, linja under, skygge (ikke når de står i venstrekolonnen)
   const ww = FW * TS, wh = FH * TS;
-  const availW = Math.max(160, W - padX - SH), availH = Math.max(120, H - padY - top - bar - SH);
+  const availW = Math.max(160, W - padX - SH - (lcol ? LCOL_W : 0)), availH = Math.max(120, H - padY - top - bar - SH);
   const tb = $('touch'), touchH = touch ? (tb.offsetHeight && !document.body.classList.contains('tside') ? tb.offsetHeight + 10 : 214) : 0;   // knappene under brettet
   let tile = Math.min(availW / FW, (availH - touchH) / FH), side = false;
   if (touch) { const ts = Math.min((availW - 2 * TOUCH_SIDE) / FW, availH / FH); if (ts > tile) { tile = ts; side = true; } }
@@ -581,12 +582,38 @@ function fitView() {
 window.addEventListener('resize', fitView);
 if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if (inGame()) fitView(); }); ro.observe($('hudrow')); ro.observe($('gamebar')); }
 // Fullskjerm: knapp i linja under brettet og F-tasten
+// PC (ikke touch): spillerlista i egen kolonne til venstre for brettet, klokka øverst, lyd + Avslutt nederst. Touch: over brettet som før.
+const LCOL_W = 212;   // kolonnebredde + mellomrom
+function placeLayout() {
+  const col = !document.body.classList.contains('touch');
+  if (placeLayout.mode === col) return; placeLayout.mode = col;
+  document.body.classList.toggle('lcol', col);
+  const hr = $('hudrow'), gb = $('gamebar'), ss = $('sndSlot'), gbt = gb.querySelector('.gbtns');
+  if (col) { hr.appendChild(gb); gbt.insertBefore(ss, gbt.firstChild); }
+  else { $('game').appendChild(gb); hr.appendChild(ss); }
+}
+// Fullskjerm som standard på PC: bes om inne i klikket/tastetrykket som starter et spill (nettlesere krever en brukerhandling).
+// Esc respekteres resten av spillet; neste spillstart ber om fullskjerm igjen. Klienter: ved første klikk/tast i lobby/spill.
+let fsArm = false;
+function autoFull() {
+  fsArm = false;
+  const d = document, el = d.documentElement;
+  if (d.body.classList.contains('touch') || d.fullscreenElement || d.webkitFullscreenElement || !(d.fullscreenEnabled || d.webkitFullscreenEnabled)) return;
+  const r = el.requestFullscreen || el.webkitRequestFullscreen;
+  try { const p = r.call(el, { navigationUI: 'hide' }); if (p && p.catch) p.catch(() => {}); } catch (e) { }
+}
+function fsGesture(e) {
+  if (!fsArm || !/^(lobby|game)$/.test(document.body.dataset.screen || '')) return;
+  if (e.type === 'keydown' && (e.code === 'KeyF' || e.code === 'Escape' || e.target.tagName === 'INPUT')) return;
+  autoFull();
+}
+window.addEventListener('pointerdown', fsGesture, true); window.addEventListener('keydown', fsGesture, true);
 function toggleFull() {
   const d = document, el = d.documentElement;
   if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
   else { const r = el.requestFullscreen || el.webkitRequestFullscreen; if (r) { const p = r.call(el); if (p && p.catch) p.catch(() => {}); } }
 }
-if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) $('btnFull').style.display = 'none';
+$('btnFull').style.display = 'none';   // skjult; F-tasten er snarvei
 $('btnFull').addEventListener('click', () => { toggleFull(); $('btnFull').blur(); });
 document.addEventListener('fullscreenchange', () => { $('btnFull').classList.toggle('on', !!document.fullscreenElement); fitView(); });
 function present(dt) {
@@ -1139,7 +1166,7 @@ function applySd(s) {
 }
 function clientOnData(d) {
   if (!d || typeof d !== 'object') return;
-  if (d.t === 'welcome') { clearTimeout(joinTimer); mySlot = d.slot; menuErr(''); show('lobby'); }
+  if (d.t === 'welcome') { clearTimeout(joinTimer); mySlot = d.slot; menuErr(''); show('lobby'); fsArm = !document.fullscreenElement; }
   else if (d.t === 'full') leave('Rommet er fullt (maks åtte spillere).');
   else if (d.t === 'lobby') {
     room.members = d.members; room.phase = d.phase; room.code = d.code; room.map = d.mp || 'small'; room.lb = d.lb || room.lb;
@@ -1154,7 +1181,7 @@ function clientOnData(d) {
     applySd(d);
     lastSq = d.sq || lastSq;
     lastSnap = d; onClientSnap(d); room.scores = d.sc || room.scores; room.lb = d.lb || room.lb;
-    if (!inGame() && room.members.some(m => m.slot === mySlot)) { for (const k in disp) delete disp[k]; show('game'); fitView(); }
+    if (!inGame() && room.members.some(m => m.slot === mySlot)) { for (const k in disp) delete disp[k]; show('game'); fitView(); fsArm = true; }
   }
 }
 let cAcc = 0, inSeq = 0, sentDir = null, sentB = -1, sentT = 0;
@@ -1203,7 +1230,7 @@ function renderLobby() {
   $('waitTxt').style.display = host ? 'none' : '';
   $('btnAddBot').disabled = room.members.length >= MAXP;
   $('btnMap').textContent = 'Brett: ' + (room.map === 'big' ? 'Stort' : 'Vanlig');
-  $('mapInfo').textContent = 'Brett: ' + MAP_NAME[room.map === 'big' ? 'big' : 'small'] + (room.map === 'big' ? ', kameraet følger deg' : '') + ' · opptil 8 spillere';
+  $('mapInfo').textContent = 'Brett: ' + MAP_NAME[room.map === 'big' ? 'big' : 'small'] + (room.map === 'big' && document.body.classList.contains('touch') ? ', kameraet følger deg på mobil' : '') + ' · opptil 8 spillere';
   $('btnDelBot').disabled = !room.members.some(m => m.bot);
   $('btnStart').disabled = room.members.length < 2;
   $('btnStart').textContent = room.members.length < 2 ? 'Start (trenger minst 2)' : 'Start';
@@ -1211,12 +1238,12 @@ function renderLobby() {
 let hudKey = '', overKey = '', hudSnap = null;
 function updateHud(s) {
   if (s === hudSnap) return; hudSnap = s;
-  const key = JSON.stringify(s.p.map(p => [p[0], p[3], p[7], p[8], p[9], p[10], p[12]]));
+  const key = JSON.stringify(s.p.map(p => [p[0], p[3], p[7], p[8], p[9], p[10], p[12], s.sc ? s.sc[p[0]] | 0 : 0]));
   if (key !== hudKey) {
     hudKey = key; const hud = $('hud'); hud.innerHTML = ''; hud.classList.toggle('many', s.p.length > 4);
     for (const p of s.p) {
       const d = document.createElement('div'); d.className = 'hp' + (p[3] ? '' : ' dead');
-      d.innerHTML = `<i style="background:${COLORS[p[0]].c}"></i><b></b><span>💣${p[7]} 🔥${p[8]} ⚡${p[9]}${p[12] ? ' 🥊' : ''}</span>`;
+      d.innerHTML = `<i style="background:${COLORS[p[0]].c}"></i><b></b><span>💣${p[7]} 🔥${p[8]} ⚡${p[9]}${p[12] ? ' 🥊' : ''}</span><em title="Seire">🏆${s.sc ? s.sc[p[0]] | 0 : 0}</em>`;
       d.querySelector('b').textContent = p[10] + (p[0] === mySlot ? ' (deg)' : '');
       hud.appendChild(d);
     }
@@ -1242,17 +1269,17 @@ function updateHud(s) {
   } else ov.classList.remove('on');
 }
 
-$('btnCreate').onclick = () => startHosting(false);
-$('btnSolo').onclick = () => startHosting(true);
-$('btnJoin').onclick = () => joinRoom(parseCode($('joinCode').value));
+$('btnCreate').onclick = () => { autoFull(); startHosting(false); };
+$('btnSolo').onclick = () => { autoFull(); startHosting(true); };
+$('btnJoin').onclick = () => { autoFull(); joinRoom(parseCode($('joinCode').value)); };
 $('joinCode').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnJoin').click(); });
-$('btnJoinInvite').onclick = () => joinRoom(parseCode($('inviteCode').textContent));
+$('btnJoinInvite').onclick = () => { autoFull(); joinRoom(parseCode($('inviteCode').textContent)); };
 $('btnAddBot').onclick = () => { addBot(); hostLobbyUpdate(); };
 $('btnDelBot').onclick = () => {
   const b = room.members.filter(m => m.bot).pop();
   if (b) { room.members = room.members.filter(m => m !== b); room.scores[b.slot] = 0; hostLobbyUpdate(); }
 };
-$('btnStart').onclick = () => startRound();
+$('btnStart').onclick = () => { autoFull(); startRound(); };
 $('btnMap').onclick = () => { room.map = room.map === 'big' ? 'small' : 'big'; setPrefMap(room.map); hostLobbyUpdate(); };
 document.querySelectorAll('#mapPick button').forEach(b => b.addEventListener('click', () => setPrefMap(b.dataset.m)));
 setPrefMap(prefMap);

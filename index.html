@@ -74,6 +74,24 @@
   #btnFull.on { background:#ffd23a; }
   body.touch.tside #touch { position:fixed; left:0; right:0; top:50%; transform:translateY(-50%); margin:0; padding:0 18px; pointer-events:none; z-index:5; }
   body.touch.tside #touch > * { pointer-events:auto; }
+  /* PC: spillerliste i kolonne til venstre for brettet (body.lcol settes i game.js) */
+  .hp em { display:none; font-style:normal; }
+  body.lcol #playarea { display:flex; gap:12px; justify-content:center; align-items:stretch; }
+  body.lcol #hudrow { display:flex; flex-direction:column; gap:8px; flex:0 0 200px; width:200px; max-width:none; margin:0; }
+  body.lcol #hudrow > div:first-child:empty, body.lcol #hudrow > div:first-child:has(#timer[style*="display: none"]) { display:none; }
+  body.lcol #timer { font-size:34px; min-width:0; text-align:left; padding:0 2px; }
+  body.lcol #hud, body.lcol #hud.many { flex-direction:column; flex-wrap:nowrap; justify-content:flex-start; padding:0; margin:0; gap:6px; font-size:14px; }
+  body.lcol #hud .hp, body.lcol #hud.many .hp { display:grid; grid-template-columns: 14px 1fr auto; grid-template-areas: "i b e" "s s s"; gap:3px 8px; padding:6px 8px; }
+  body.lcol #hud .hp i { grid-area:i; width:14px; height:14px; align-self:center; }
+  body.lcol #hud .hp b { grid-area:b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  body.lcol #hud .hp span { grid-area:s; font-size:13px; opacity:.9; }
+  body.lcol #hud .hp em { grid-area:e; display:inline; color:#ffd23a; font-weight:bold; }
+  body.lcol #gamebar { margin:auto 0 0; width:auto; max-width:none; flex-direction:column; align-items:stretch; gap:6px; font-size:12px; }
+  body.lcol #gamebar .keys { line-height:1.4; }
+  body.lcol #gamebar .gbtns { justify-content:space-between; align-items:center; }
+  body.lcol #gamebar #sndSlot { display:flex; }
+  body.lcol #playarea > #wrap, body.lcol #stage { flex:0 0 auto; width:auto; }
+  #btnFull { display:none !important; }
   #wintxt { font-size:26px; color:#ffd23a; margin-bottom:6px; }
   #touch { display:none; justify-content:space-between; align-items:center; margin-top:10px; padding: 0 6px; }
   body.touch #touch { display:flex; }
@@ -275,6 +293,7 @@
 
 <!-- SPILL -->
 <section id="game" class="screen">
+  <div id="playarea">
   <div id="hudrow"><div><div id="timer" title="Tid igjen av runden"></div></div><div id="hud"></div><span id="sndSlot"></span></div>
   <div id="wrap">
     <canvas id="cv" width="240" height="208"></canvas>
@@ -291,6 +310,7 @@
       </div>
     </div>
   </div>
+  </div><!-- /playarea -->
   <div id="touch">
     <div class="dpad">
       <button class="u" data-dir="up">▲</button>
@@ -301,7 +321,7 @@
     <button id="tbomb">BOMBE</button>
   </div>
   <div id="gamebar">
-    <span class="keys">Piltaster/WASD flytter · Mellomrom legger bombe · F = fullskjerm</span>
+    <span class="keys">Piltaster/WASD flytter · Mellomrom legger bombe</span>
     <span id="netInfo"></span>
     <span class="gbtns"><button class="grey" id="btnFull" title="Fullskjerm (F)">⛶ Fullskjerm</button><button class="red" id="btnQuit">Avslutt</button></span>
   </div>
