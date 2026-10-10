@@ -6,5 +6,18 @@
   "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#0e1016",
-  "theme_color": "#0e1016"
+  "theme_color": "#0e1016",
+  "description": "Free multiplayer bomb maze game in your browser.",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
 }
